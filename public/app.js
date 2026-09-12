@@ -1,7 +1,7 @@
 import { FOUNDRY_EIGHT, STARTER_STATE, preCacContribution, postCacContribution, maxFirstOrderCac, grossMarginPct, contributionMarginPct, breakEvenOrders, inventoryMath, wholesaleContribution, retailerGrossMarginPct, normalized3pl, crossoverOrders, cashCheckpoint, processorFee, realizedPrice, purchaseOrderGate, cacFromSpend, funnelMetrics } from './math.js';
 import { summarizeShopifyCsv } from './shopify.js';
 
-const VERSION='5.2'; const clone=x=>JSON.parse(JSON.stringify(x));
+const VERSION='5.3'; const clone=x=>JSON.parse(JSON.stringify(x));
 function safeStoredJson(key,fallback){
   try{
     const raw=localStorage.getItem(key);
@@ -248,13 +248,20 @@ function brandsView(){if(!session)return `${head('Brands & SKUs','Cloud saving n
 
 async function addBrand(){
   const input=$('#brandName');
+  const btn=$('#addBrand');
   const name=input?.value.trim();
   if(!name){alert('Enter a brand name.');return}
+  if(brands.some(b=>String(b.name||'').trim().toLowerCase()===name.toLowerCase())){alert('That brand already exists in your account.');return}
+  if(btn?.disabled)return;
+  if(btn){btn.disabled=true;btn.textContent='Saving…'}
   try{
     await api('/api/brands','POST',{name},true);
     await loadCloud();
     render();
-  }catch(e){alert(e.message)}
+  }catch(e){
+    if(btn){btn.disabled=false;btn.textContent='Add brand'}
+    alert(e.message)
+  }
 }
 
 async function addSku(brandId){
@@ -262,13 +269,20 @@ async function addSku(brandId){
   const name=$(`#name-${brandId}`)?.value.trim();
   const priceRaw=$(`#price-${brandId}`)?.value;
   const retail_price=Number(priceRaw);
+  const btn=document.querySelector(`[data-addsku="${brandId}"]`);
   if(!sku||!name){alert('Enter both the SKU and product name.');return}
   if(priceRaw===''||!Number.isFinite(retail_price)||retail_price<0){alert('Enter a valid retail price.');return}
+  if(skus.some(s=>String(s.brand_id)===String(brandId)&&String(s.sku||'').trim().toLowerCase()===sku.toLowerCase())){alert('That SKU already exists under this brand.');return}
+  if(btn?.disabled)return;
+  if(btn){btn.disabled=true;btn.textContent='Saving…'}
   try{
     await api('/api/skus','POST',{brand_id:brandId,sku,name,retail_price},true);
     await loadCloud();
     render();
-  }catch(e){alert(e.message)}
+  }catch(e){
+    if(btn){btn.disabled=false;btn.textContent='Add'}
+    alert(e.message)
+  }
 }
 
 
@@ -278,13 +292,13 @@ function nextMoves(){
   const es=effectiveState(), pc=readyCac()?postCacContribution(es):null, im=inventoryMath(state), cashx=readyCash()?cashCheckpoint(state):null, poc=readyCash()&&hasInput('proposedUnits')&&hasInput('depositPct')?purchaseOrderGate(state):null, mx=readyCacFloor()?maxFirstOrderCac(es):null;
   if(!readyCac()) out.push(['Finish the acquisition model','Set a post-CAC contribution floor and enter CAC directly or calculate it from spend ÷ new customers.']);
   else if(pc<=0) out.push(['Stop scaling acquisition','The modeled acquired order loses contribution. Fix price, variable cost, offer or CAC first.']);
-  else if(effectiveCac()>mx) out.push(['Bring CAC back under the ceiling',`Modeled CAC ${money(effectiveCac())} is above the ${money(mx)} ceiling created by your own contribution floor.`]);
+  else if(effectiveCac()>mx+0.005) out.push(['Bring CAC back under the ceiling',`Modeled CAC ${money(effectiveCac())} is above the ${money(mx)} ceiling created by your own contribution floor.`]);
 
   if(readyCash()&&cashx.headroom<0) out.push(['Protect cash',`${money(Math.abs(cashx.headroom))} below the protected floor in the quick checkpoint.`]);
   if(poc&&poc.fullPoHeadroom<0) out.push(['Hold the proposed PO',`Full payment would put cash ${money(Math.abs(poc.fullPoHeadroom))} below the protected floor.`]);
   if(readyInv()&&im.inventoryPosition<=im.reorderPoint) out.push(['Review the next reorder',`${Math.ceil(im.inventoryPosition)} units positioned vs ${Math.ceil(im.reorderPoint)} review point. Confirm demand quality and cash before ordering.`]);
 
-  if(readyCac()&&pc>0&&effectiveCac()<=mx&&out.length===0) out.push(['Protect the economics',`Modeled first-order contribution after acquisition is ${money(pc)}. Keep watching cost, discount depth and CAC rather than chasing revenue alone.`]);
+  if(readyCac()&&pc>0&&effectiveCac()<=mx+0.005&&out.length===0) out.push(['Protect the economics',`Modeled first-order contribution after acquisition is ${money(pc)}. Keep watching cost, discount depth and CAC rather than chasing revenue alone.`]);
 
   const n3=hasInput('monthlyOrders')&&state.monthlyOrders>0&&hasInput('inhouseFulfillment')&&hasInput('thirdPartyVariable')&&hasInput('thirdPartyMonthly')?normalized3pl(state):Infinity;
   if(Number.isFinite(n3)&&n3<state.inhouseFulfillment) out.push(['Review the 3PL quote in detail','The cost-only model favors the 3PL at this volume; service levels and transition risk still need review.']);
@@ -325,16 +339,42 @@ async function auth(kind){const email=$('#email').value.trim(),password=$('#pass
 function showAccount(){showModal(`<h2>Account</h2><p>${escapeHtml(session?.user?.email||'Signed in')}</p><p>Plan: <b>${entitlement.plan.toUpperCase()}</b></p><div class="split"><button id="signout" class="outline">Sign out</button>${config.billingConfigured?`<button id="acctBilling" class="primary">${entitlement.active?'Manage billing':'Upgrade to Pro'}</button>`:''}</div>`);$('#signout').onclick=()=>{storeSession(null);brands=[];skus=[];hideModal();refreshAccount();render()};const b=$('#acctBilling');if(b)b.onclick=startBilling}
 async function startBilling(){try{const endpoint=entitlement.active?'/api/create-portal-session':'/api/create-checkout-session';const x=await api(endpoint,'POST',{},true);location.href=x.url}catch(e){alert(e.message)}}
 function showModal(html){$('#modalBody').innerHTML=html;$('#modal').classList.remove('hidden')}function hideModal(){$('#modal').classList.add('hidden')}
-const navEl=$('#nav');
-if(navEl)navEl.onclick=e=>{const b=e.target.closest('button[data-view]');if(b)jumpTo(b.dataset.view)};
-const menuBtn=$('#menuBtn');
-if(menuBtn)menuBtn.onclick=()=>$('#side')?.classList.toggle('open');
-const demoBtn=$('#demoBtn');
-if(demoBtn)demoBtn.onclick=()=>{state=clone(FOUNDRY_EIGHT);mode='demo';touched=new Set(Object.keys(FOUNDRY_EIGHT));save();render()};
-const freshBtn=$('#freshBtn');
-if(freshBtn)freshBtn.onclick=()=>{if(confirm('Clear the local calculator model and start fresh?')){state=clone(STARTER_STATE);mode='fresh';touched=new Set();lastImport=null;save();render()}};
-const authBtn=$('#authBtn'); if(authBtn)authBtn.onclick=showAuth;
-const billingBtn=$('#billingBtn'); if(billingBtn)billingBtn.onclick=startBilling;
-const closeModal=$('#closeModal'); if(closeModal)closeModal.onclick=hideModal;
-const modalEl=$('#modal'); if(modalEl)modalEl.onclick=e=>{if(e.target.id==='modal')hideModal()};
+function loadFoundryDemo(){
+  state=clone(FOUNDRY_EIGHT);
+  mode='demo';
+  touched=new Set(Object.keys(FOUNDRY_EIGHT));
+  lastImport=null;
+  current='dashboard';
+  save();
+  render();
+  document.querySelectorAll('#nav button').forEach(x=>x.classList.toggle('active',x.dataset.view==='dashboard'));
+  window.scrollTo(0,0);
+}
+function startFreshModel(){
+  state=clone(STARTER_STATE);
+  mode='fresh';
+  touched=new Set();
+  lastImport=null;
+  current='dashboard';
+  save();
+  render();
+  document.querySelectorAll('#nav button').forEach(x=>x.classList.toggle('active',x.dataset.view==='dashboard'));
+  window.scrollTo(0,0);
+  const btn=$('#freshBtn');
+  if(btn){const old=btn.textContent;btn.textContent='Fresh model loaded ✓';setTimeout(()=>{if(btn.isConnected)btn.textContent=old},1200)}
+}
+
+// Global controls use event delegation so they keep working after every render/state switch.
+document.addEventListener('click',e=>{
+  const navBtn=e.target.closest('#nav button[data-view]');
+  if(navBtn){jumpTo(navBtn.dataset.view);return}
+  if(e.target.closest('#menuBtn')){$('#side')?.classList.toggle('open');return}
+  if(e.target.closest('#demoBtn')){e.preventDefault();loadFoundryDemo();return}
+  if(e.target.closest('#freshBtn')){e.preventDefault();startFreshModel();return}
+  if(e.target.closest('#authBtn')){showAuth();return}
+  if(e.target.closest('#billingBtn')){startBilling();return}
+  if(e.target.closest('#closeModal')){hideModal();return}
+  if(e.target.id==='modal'){hideModal();return}
+});
+
 init();
