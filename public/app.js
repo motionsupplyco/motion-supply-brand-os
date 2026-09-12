@@ -275,7 +275,6 @@ function bind(){
   document.querySelectorAll('[data-addsku]').forEach(b=>b.onclick=()=>addSku(b.dataset.addsku))
 }
 function jumpTo(view){current=view;document.querySelectorAll('#nav button').forEach(x=>x.classList.toggle('active',x.dataset.view===view));$('#side').classList.remove('open');render();scrollTo(0,0)}
-async 
 async function handleCsv(e){
   const file=e.target.files[0];if(!file)return;
   if(session&&!entitlement.active&&config.billingConfigured){alert('Shopify CSV dashboard is a Pro feature for signed-in users.');return}
