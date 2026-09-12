@@ -262,7 +262,7 @@ function escapeHtml(s){return String(s??'').replace(/[&<>'"]/g,c=>({'&':'&amp;',
 function render(){ $('#title').textContent=views[current];const map={dashboard,profit,cac,funnel,discount,inventory,wholesale,launch,fulfillment,cash,po,shopify,brands:brandsView,advisor};$('#app').innerHTML=map[current]();bind();updateAccount() }
 
 function bind(){
-  document.querySelectorAll('[data-key]').forEach(el=>el.oninput=e=>{
+  document.querySelectorAll('[data-key]').forEach(el=>el.onchange=e=>{
     const key=e.target.dataset.key,raw=e.target.value;
     if(raw===''){touched.delete(key);state[key]=0}else{touched.add(key);state[key]=Number(raw)}
     mode=mode==='demo'||mode==='demo-edited'?'demo-edited':'fresh';save();render()
