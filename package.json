@@ -1,0 +1,20 @@
+{
+  "name": "motion-supply-brand-os-pro",
+  "version": "5.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "node --test tests/*.test.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.0.0",
+    "dotenv": "^16.4.0",
+    "express": "^5.1.0",
+    "stripe": "^18.0.0"
+  }
+}
