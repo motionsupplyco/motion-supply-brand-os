@@ -15,3 +15,22 @@
 .warning,.empty{border:1px solid var(--line);border-radius:12px;padding:14px 16px;background:#fff8e8;color:var(--ink);line-height:1.45}.warning b,.empty b{display:block;margin-bottom:4px}.empty{background:#faf9f6}
 .formDivider{grid-column:1/-1;margin-top:4px;padding-top:12px;border-top:1px solid var(--line);font-size:10px;font-weight:800;letter-spacing:.08em;color:var(--muted)}
 .importRange{margin-top:10px}
+/* Sidebar overlap fix */
+.side {
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.side nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.side nav button {
+  min-height: 44px;
+  height: auto;
+  white-space: normal;
+  line-height: 1.2;
+  flex-shrink: 0;
+}
