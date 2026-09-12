@@ -1,13 +1,22 @@
 import { FOUNDRY_EIGHT, STARTER_STATE, preCacContribution, postCacContribution, maxFirstOrderCac, grossMarginPct, contributionMarginPct, breakEvenOrders, inventoryMath, wholesaleContribution, retailerGrossMarginPct, normalized3pl, crossoverOrders, cashCheckpoint, processorFee, realizedPrice, purchaseOrderGate, cacFromSpend, funnelMetrics } from './math.js';
 import { summarizeShopifyCsv } from './shopify.js';
 
-const VERSION='5'; const clone=x=>JSON.parse(JSON.stringify(x));
-const storedVersion=localStorage.getItem('msbo_version');
-let state=storedVersion===VERSION?{...clone(STARTER_STATE),...JSON.parse(localStorage.getItem('msbo_state')||'{}')}:clone(STARTER_STATE);
-let mode=storedVersion===VERSION?(localStorage.getItem('msbo_mode')||'fresh'):'fresh';
-let touched=new Set(storedVersion===VERSION?JSON.parse(localStorage.getItem('msbo_touched')||'[]'):[]);
-let lastImport=storedVersion===VERSION?JSON.parse(localStorage.getItem('msbo_last_import')||'null'):null;
-localStorage.setItem('msbo_version',VERSION); if(storedVersion!==VERSION){localStorage.setItem('msbo_state',JSON.stringify(state));localStorage.setItem('msbo_mode',mode);localStorage.setItem('msbo_touched','[]');localStorage.removeItem('msbo_last_import')}
+const VERSION='5.2'; const clone=x=>JSON.parse(JSON.stringify(x));
+function safeStoredJson(key,fallback){
+  try{
+    const raw=localStorage.getItem(key);
+    if(!raw)return fallback;
+    const parsed=JSON.parse(raw);
+    return parsed ?? fallback;
+  }catch{return fallback}
+}
+const storedState=safeStoredJson('msbo_state',{});
+let state={...clone(STARTER_STATE),...(storedState&&typeof storedState==='object'?storedState:{})};
+let mode=localStorage.getItem('msbo_mode')||'fresh';
+const storedTouched=safeStoredJson('msbo_touched',[]);
+let touched=new Set(Array.isArray(storedTouched)?storedTouched:[]);
+let lastImport=safeStoredJson('msbo_last_import',null);
+localStorage.setItem('msbo_version',VERSION);
 let config={authConfigured:false,cloudConfigured:false,billingConfigured:false},session=loadSession(),entitlement={plan:'free',active:false};
 let current='dashboard',brands=[],skus=[];
 const $=s=>document.querySelector(s); const money=n=>new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(Number.isFinite(+n)?+n:0); const pct=n=>`${(+n||0).toFixed(1)}%`;
@@ -62,7 +71,7 @@ function onboarding(){
 function dashboard(){
   if(!readyProduct()) return `${onboarding()}<div class="sectionbar"><h3>Start with decisions that cost money</h3><span>No fake KPIs</span></div><div class="healthgrid"><div class="healthcard"><b>Profit before revenue</b><p>Build one product's real order economics before you spend to acquire customers.</p></div><div class="healthcard"><b>Cash before inventory</b><p>Protect operating cash before approving a production order.</p></div><div class="healthcard"><b>Demand before reorder</b><p>Use actual sales pace and lead time; comments and waitlists are signals, not guaranteed demand.</p></div></div>`;
   const es=effectiveState(), c=preCacContribution(es), pc=readyCac()?postCacContribution(es):null, im=inventoryMath(state), maxcac=readyCacFloor()?maxFirstOrderCac(es):null;
-  const be=readyCac()&&hasInput('fixedLaunchCost')?breakEvenOrders(es):Infinity, cashx=readyCash()?cashCheckpoint(state):null, poc=readyCash()&&hasInput('proposedUnits')?purchaseOrderGate(state):null;
+  const be=readyCac()&&hasInput('fixedLaunchCost')?breakEvenOrders(es):Infinity, cashx=readyCash()?cashCheckpoint(state):null, poc=readyCash()&&hasInput('proposedUnits')&&hasInput('depositPct')?purchaseOrderGate(state):null;
   const profitKind=readyCac()?(pc>=state.requiredPostCac?'good':pc>0?'warn':'bad'):'warn';
   const cacKind=readyCac()?(effectiveCac()<=maxcac?'good':effectiveCac()<=maxcac*1.15?'warn':'bad'):'warn';
   const invKind=readyInv()?(im.inventoryPosition>im.reorderPoint?'good':'warn'):'warn';
@@ -234,7 +243,33 @@ function renderImport(x,compact=false){
   const date=x.startDate||x.endDate?`<div class="mini importRange">Export range: ${escapeHtml(x.startDate||'—')} → ${escapeHtml(x.endDate||'—')}</div>`:'';
   return `${date}<div class="grid g4 mt">${metric('Orders in export',x.orderCount,'Unique order names')}${metric('Non-canceled order total',money(x.nonCanceledOrderTotal ?? x.csvOrderTotal),'Order Total field, excluding rows marked canceled')}${metric('Units in line items',x.units,'Line-item quantities')}${metric('Avg exported order total',money(x.averageOrderTotal),'CSV order total ÷ all exported orders')}</div>${compact?'':`<div class="grid g3 mt">${metric('Canceled orders',x.canceledOrders ?? 0)}${metric('Discount amount',money(x.csvDiscountAmount),'Exported order-level discount field')}${metric('Unique customer emails',x.uniqueCustomerEmails)}</div><div class="warning mt"><b>Not Shopify Analytics net sales.</b>This Orders CSV snapshot is an operational export. Returns and sales reversals can differ from Shopify Analytics. Use Transaction history for captured/refunded payment cash and Shopify Analytics for official net-sales reporting.</div><div class="table mt"><table><thead><tr><th>Top SKU / item</th><th>Units</th><th>Line-item value</th></tr></thead><tbody>${x.topSkus.map(s=>`<tr><td>${escapeHtml(s.sku)}</td><td>${s.units}</td><td>${money(s.value)}</td></tr>`).join('')}</tbody></table></div>`}`
 }
-function brandsView(){if(!session)return `${head('Brands & SKUs','Cloud saving needs an account. Calculators still work locally.','Secure cloud storage')}<div class="card"><p>Sign in to save brands and SKUs. Account traffic is proxied through the Brand OS server so the browser does not depend on a third-party CDN connection.</p><button class="primary" id="inlineSignIn">Sign in</button></div>`;return `${head('Brands & SKUs','Save basic product economics under your account.','Owner-scoped cloud rows')}<div class="card"><div class="split"><input id="brandName" placeholder="Brand name" style="flex:1;padding:11px;border:1px solid #ccc;border-radius:8px"><button id="addBrand" class="primary">Add brand</button></div></div><div class="grid g2 mt">${brands.map(b=>`<div class="card"><div class="skuBar"><div><b>${escapeHtml(b.name)}</b><div class="mini">${escapeHtml(b.currency)}</div></div></div><hr style="border:0;border-top:1px solid #eee"><div class="mini">${skus.filter(s=>s.brand_id===b.id).length} saved SKUs</div><div class="split" style="margin-top:10px"><input id="sku-${b.id}" placeholder="SKU" style="width:90px;padding:8px"><input id="name-${b.id}" placeholder="Product" style="flex:1;padding:8px"><button data-addsku="${b.id}" class="outline">Add</button></div>${skus.filter(s=>s.brand_id===b.id).map(s=>`<div class="row"><span>${escapeHtml(s.sku)} · ${escapeHtml(s.name)}</span><b>${money(s.retail_price)}</b></div>`).join('')}</div>`).join('')||'<div class="card">No brands yet.</div>'}</div>`}
+function brandsView(){if(!session)return `${head('Brands & SKUs','Cloud saving needs an account. Calculators still work locally.','Secure cloud storage')}<div class="card"><p>Sign in to save brands and SKUs. Account traffic is proxied through the Brand OS server so the browser does not depend on a third-party CDN connection.</p><button class="primary" id="inlineSignIn">Sign in</button></div>`;return `${head('Brands & SKUs','Save basic product economics under your account.','Owner-scoped cloud rows')}<div class="card"><div class="split"><input id="brandName" placeholder="Brand name" style="flex:1;padding:11px;border:1px solid #ccc;border-radius:8px"><button id="addBrand" class="primary">Add brand</button></div></div><div class="grid g2 mt">${brands.map(b=>`<div class="card"><div class="skuBar"><div><b>${escapeHtml(b.name)}</b><div class="mini">${escapeHtml(b.currency)}</div></div></div><hr style="border:0;border-top:1px solid #eee"><div class="mini">${skus.filter(s=>s.brand_id===b.id).length} saved SKUs</div><div class="split" style="margin-top:10px"><input id="sku-${b.id}" placeholder="SKU" style="width:90px;padding:8px"><input id="name-${b.id}" placeholder="Product" style="flex:1;padding:8px"><input id="price-${b.id}" type="number" min="0" step=".01" placeholder="Retail $" style="width:110px;padding:8px"><button data-addsku="${b.id}" class="outline">Add</button></div>${skus.filter(s=>s.brand_id===b.id).map(s=>`<div class="row"><span>${escapeHtml(s.sku)} · ${escapeHtml(s.name)}</span><b>${money(s.retail_price)}</b></div>`).join('')}</div>`).join('')||'<div class="card">No brands yet.</div>'}</div>`}
+
+
+async function addBrand(){
+  const input=$('#brandName');
+  const name=input?.value.trim();
+  if(!name){alert('Enter a brand name.');return}
+  try{
+    await api('/api/brands','POST',{name},true);
+    await loadCloud();
+    render();
+  }catch(e){alert(e.message)}
+}
+
+async function addSku(brandId){
+  const sku=$(`#sku-${brandId}`)?.value.trim();
+  const name=$(`#name-${brandId}`)?.value.trim();
+  const priceRaw=$(`#price-${brandId}`)?.value;
+  const retail_price=Number(priceRaw);
+  if(!sku||!name){alert('Enter both the SKU and product name.');return}
+  if(priceRaw===''||!Number.isFinite(retail_price)||retail_price<0){alert('Enter a valid retail price.');return}
+  try{
+    await api('/api/skus','POST',{brand_id:brandId,sku,name,retail_price},true);
+    await loadCloud();
+    render();
+  }catch(e){alert(e.message)}
+}
 
 
 function nextMoves(){
@@ -259,7 +294,7 @@ function nextMoves(){
 function advisor(){const out=nextMoves();return `${head('Next Move Advisor','Rule-based operating prompts from your inputs. These are not forecasts and they do not replace judgment.','Motion Supply operating logic')}<div class="grid g2">${out.map((x,i)=>`<div class="card"><span class="kicker">MOVE ${i+1}</span><h3>${x[0]}</h3><p>${x[1]}</p></div>`).join('')}</div>`}
 
 function escapeHtml(s){return String(s??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}
-function render(){ $('#title').textContent=views[current];const map={dashboard,profit,cac,funnel,discount,inventory,wholesale,launch,fulfillment,cash,po,shopify,brands:brandsView,advisor};$('#app').innerHTML=map[current]();bind();updateAccount() }
+function render(){ const title=$('#title'),app=$('#app');if(title)title.textContent=views[current];if(!app)return;const map={dashboard,profit,cac,funnel,discount,inventory,wholesale,launch,fulfillment,cash,po,shopify,brands:brandsView,advisor};app.innerHTML=map[current]();bind();updateAccount() }
 
 function bind(){
   document.querySelectorAll('[data-key]').forEach(el=>el.onchange=e=>{
@@ -274,7 +309,7 @@ function bind(){
   const ab=$('#addBrand');if(ab)ab.onclick=addBrand;
   document.querySelectorAll('[data-addsku]').forEach(b=>b.onclick=()=>addSku(b.dataset.addsku))
 }
-function jumpTo(view){current=view;document.querySelectorAll('#nav button').forEach(x=>x.classList.toggle('active',x.dataset.view===view));$('#side').classList.remove('open');render();scrollTo(0,0)}
+function jumpTo(view){current=view;document.querySelectorAll('#nav button').forEach(x=>x.classList.toggle('active',x.dataset.view===view));$('#side')?.classList.remove('open');render();scrollTo(0,0)}
 async function handleCsv(e){
   const file=e.target.files[0];if(!file)return;
   if(session&&!entitlement.active&&config.billingConfigured){alert('Shopify CSV dashboard is a Pro feature for signed-in users.');return}
@@ -290,5 +325,16 @@ async function auth(kind){const email=$('#email').value.trim(),password=$('#pass
 function showAccount(){showModal(`<h2>Account</h2><p>${escapeHtml(session?.user?.email||'Signed in')}</p><p>Plan: <b>${entitlement.plan.toUpperCase()}</b></p><div class="split"><button id="signout" class="outline">Sign out</button>${config.billingConfigured?`<button id="acctBilling" class="primary">${entitlement.active?'Manage billing':'Upgrade to Pro'}</button>`:''}</div>`);$('#signout').onclick=()=>{storeSession(null);brands=[];skus=[];hideModal();refreshAccount();render()};const b=$('#acctBilling');if(b)b.onclick=startBilling}
 async function startBilling(){try{const endpoint=entitlement.active?'/api/create-portal-session':'/api/create-checkout-session';const x=await api(endpoint,'POST',{},true);location.href=x.url}catch(e){alert(e.message)}}
 function showModal(html){$('#modalBody').innerHTML=html;$('#modal').classList.remove('hidden')}function hideModal(){$('#modal').classList.add('hidden')}
-$('#nav').onclick=e=>{const b=e.target.closest('button[data-view]');if(b)jumpTo(b.dataset.view)};$('#menuBtn').onclick=()=>$('#side').classList.toggle('open');$('#demoBtn').onclick=()=>{state=clone(FOUNDRY_EIGHT);mode='demo';touched=new Set(Object.keys(FOUNDRY_EIGHT));save();render()};$('#freshBtn').onclick=()=>{if(confirm('Clear the local calculator model and start fresh?')){state=clone(STARTER_STATE);mode='fresh';touched=new Set();lastImport=null;save();render()}};$('#authBtn').onclick=showAuth;$('#billingBtn').onclick=startBilling;$('#closeModal').onclick=hideModal;$('#modal').onclick=e=>{if(e.target.id==='modal')hideModal()};
+const navEl=$('#nav');
+if(navEl)navEl.onclick=e=>{const b=e.target.closest('button[data-view]');if(b)jumpTo(b.dataset.view)};
+const menuBtn=$('#menuBtn');
+if(menuBtn)menuBtn.onclick=()=>$('#side')?.classList.toggle('open');
+const demoBtn=$('#demoBtn');
+if(demoBtn)demoBtn.onclick=()=>{state=clone(FOUNDRY_EIGHT);mode='demo';touched=new Set(Object.keys(FOUNDRY_EIGHT));save();render()};
+const freshBtn=$('#freshBtn');
+if(freshBtn)freshBtn.onclick=()=>{if(confirm('Clear the local calculator model and start fresh?')){state=clone(STARTER_STATE);mode='fresh';touched=new Set();lastImport=null;save();render()}};
+const authBtn=$('#authBtn'); if(authBtn)authBtn.onclick=showAuth;
+const billingBtn=$('#billingBtn'); if(billingBtn)billingBtn.onclick=startBilling;
+const closeModal=$('#closeModal'); if(closeModal)closeModal.onclick=hideModal;
+const modalEl=$('#modal'); if(modalEl)modalEl.onclick=e=>{if(e.target.id==='modal')hideModal()};
 init();
