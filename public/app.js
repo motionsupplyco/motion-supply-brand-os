@@ -1,7 +1,7 @@
 import { FOUNDRY_EIGHT, STARTER_STATE, preCacContribution, postCacContribution, maxFirstOrderCac, grossMarginPct, contributionMarginPct, breakEvenOrders, inventoryMath, wholesaleContribution, retailerGrossMarginPct, normalized3pl, crossoverOrders, cashCheckpoint, processorFee, realizedPrice, purchaseOrderGate, cacFromSpend, funnelMetrics } from './math.js';
 import { summarizeShopifyCsv } from './shopify.js';
 
-const VERSION='5.3'; const clone=x=>JSON.parse(JSON.stringify(x));
+const VERSION='5.5'; const clone=x=>JSON.parse(JSON.stringify(x));
 function safeStoredJson(key,fallback){
   try{
     const raw=localStorage.getItem(key);
@@ -17,12 +17,12 @@ const storedTouched=safeStoredJson('msbo_touched',[]);
 let touched=new Set(Array.isArray(storedTouched)?storedTouched:[]);
 let lastImport=safeStoredJson('msbo_last_import',null);
 localStorage.setItem('msbo_version',VERSION);
-let config={authConfigured:false,cloudConfigured:false,billingConfigured:false},session=loadSession(),entitlement={plan:'free',active:false};
+let config={authConfigured:false,cloudConfigured:false,billingConfigured:false},session=loadSession(),entitlement={plan:'free',active:false,limits:{brands:1,skus:5},usage:{brands:0,skus:0}};
 let current='dashboard',brands=[],skus=[];
 const $=s=>document.querySelector(s); const money=n=>new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(Number.isFinite(+n)?+n:0); const pct=n=>`${(+n||0).toFixed(1)}%`;
 const save=()=>{localStorage.setItem('msbo_state',JSON.stringify(state));localStorage.setItem('msbo_mode',mode);localStorage.setItem('msbo_version',VERSION);localStorage.setItem('msbo_touched',JSON.stringify([...touched]));if(lastImport)localStorage.setItem('msbo_last_import',JSON.stringify(lastImport));else localStorage.removeItem('msbo_last_import')};
 const status=(kind,label)=>`<span class="status ${kind}">${label}</span>`;
-const metric=(a,b,c='',kind='')=>`<div class="metric"><span class="metricAccent"></span><div class="metricTop"><small>${a}</small>${kind?status(kind,kind==='good'?'HEALTHY':kind==='warn'?'WATCH':'FIX'):''}</div><strong>${b}</strong><div class="metricNote">${c}</div></div>`;
+const metric=(a,b,c='',kind='',info=null)=>`<div class="metric"><span class="metricAccent"></span><div class="metricTop"><small>${a}</small>${kind?status(kind,kind==='good'?'HEALTHY':kind==='warn'?'WATCH':'FIX'):''}</div><strong>${b}</strong><div class="metricNote">${c}</div>${info?`<details class="metricDetails"><summary>What does this mean?</summary><div class="mini mt">${info.definition?`<p><b>What it is:</b> ${info.definition}</p>`:''}${info.why?`<p><b>Why it matters:</b> ${info.why}</p>`:''}${info.math?`<p><b>How it is calculated:</b> ${info.math}</p>`:''}${info.action?`<p><b>What to do next:</b> ${info.action}</p>`:''}${info.source?`<p><b>Based on:</b> ${info.source}</p>`:''}</div></details>`:''}</div>`;
 const hasInput=key=>mode==='demo'||mode==='demo-edited'||touched.has(key);
 const field=(key,label,help='',step='.01',placeholder='Enter value')=>`<div class="field"><label>${label}</label><input data-key="${key}" type="number" step="${step}" value="${hasInput(key)?state[key]:''}" placeholder="${placeholder}">${help?`<small>${help}</small>`:''}</div>`;
 const sourceBadge=(label=mode==='demo'?'DEMO CASE':mode==='demo-edited'?'EDITED DEMO':'USER INPUT')=>`<span class="sourceTag">${label}</span>`;
@@ -50,22 +50,54 @@ async function api(url,method='GET',body,withAuth=false){
   }
   const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||`Request failed (${r.status})`);return j
 }
-async function init(){config=await fetch('/api/public-config').then(r=>r.json()).catch(()=>config);await refreshAccount();render()}
-async function refreshAccount(){if(!session){entitlement={plan:config.authConfigured?'free':'local',active:false};brands=[];skus=[];updateAccount();return}try{const acct=await api('/api/account','GET',null,true);entitlement={plan:acct.plan,active:acct.active};await loadCloud()}catch(e){storeSession(null);brands=[];skus=[];entitlement={plan:'free',active:false}}updateAccount()}
+async function init(){config=await fetch('/api/public-config').then(r=>r.json()).catch(()=>config);await refreshAccount();track('landing_page_viewed');render()}
+async function refreshAccount(){if(!session){entitlement={plan:config.authConfigured?'free':'local',active:false,limits:{brands:1,skus:5},usage:{brands:0,skus:0}};brands=[];skus=[];updateAccount();return}try{const acct=await api('/api/account','GET',null,true);entitlement={plan:acct.plan,active:acct.active,limits:acct.limits||{brands:1,skus:5},usage:acct.usage||{brands:0,skus:0}};await loadCloud()}catch(e){storeSession(null);brands=[];skus=[];entitlement={plan:'free',active:false,limits:{brands:1,skus:5},usage:{brands:0,skus:0}}}updateAccount()}
 function updateAccount(){if(!$('#planPill'))return;$('#planPill').textContent=session?entitlement.plan.toUpperCase():(mode==='demo'?'DEMO':mode==='demo-edited'?'DEMO*':'LOCAL');$('#authBtn').textContent=session?'Account':'Sign in';$('#billingBtn').classList.toggle('hidden',!session||!config.billingConfigured);$('#billingBtn').textContent=entitlement.active?'Billing':'Upgrade'}
 async function loadCloud(){const [b,s]=await Promise.all([api('/api/brands','GET',null,true),api('/api/skus','GET',null,true)]);brands=b.brands||[];skus=s.skus||[]}
 
+
+const analyticsId=localStorage.getItem('msbo_anon_id')||crypto.randomUUID();localStorage.setItem('msbo_anon_id',analyticsId);
+const tracked=safeStoredJson('msbo_tracked_events',{});
+async function track(name,properties={}){try{await fetch('/api/events',{method:'POST',headers:{'Content-Type':'application/json',...(session?.access_token?{Authorization:`Bearer ${session.access_token}`}:{})},body:JSON.stringify({event_name:name,anonymous_id:analyticsId,properties})})}catch{}}
+function trackOnce(name,properties={}){if(tracked[name])return;tracked[name]=true;localStorage.setItem('msbo_tracked_events',JSON.stringify(tracked));track(name,properties)}
+
 const views={dashboard:'Business Health',profit:'Profit & Pricing',cac:'Customer Acquisition Cost',funnel:'Store Funnel',discount:'Discount Ceiling',inventory:'Inventory & Reorder',wholesale:'Wholesale Economics',launch:'Launch & Break-Even',fulfillment:'3PL Decision',cash:'Cash Checkpoint',po:'PO Cash Gate',shopify:'Shopify CSV Dashboard',brands:'Brands & SKUs',advisor:'Next Move Advisor'};
 
+// Free proves the core model. Pro unlocks the recurring operating layer.
+const PRO_VIEWS=new Set(['discount','inventory','wholesale','launch','fulfillment','cash','po','shopify']);
+const isPro=()=>Boolean(entitlement?.active);
+const isProLocked=view=>Boolean(config.billingConfigured&&!isPro()&&mode!=='demo'&&mode!=='demo-edited'&&PRO_VIEWS.has(view));
+function proGate(view){
+  const reasons={
+    discount:['Discount Ceiling','Know how deep you can discount without crossing the contribution floor you set.'],
+    inventory:['Inventory & Reorder','Turn demand and supplier lead time into a reorder review trigger instead of guessing.'],
+    wholesale:['Wholesale Economics','Check whether a wholesale deal leaves enough unit contribution before you accept it.'],
+    launch:['Launch & Break-Even','See how many contribution-positive orders are required to recover fixed launch costs.'],
+    fulfillment:['3PL Decision','Normalize fulfillment costs so monthly minimums do not hide the real per-order cost.'],
+    cash:['Cash Checkpoint','Stress-test near-term liquidity against the cash floor you choose to protect.'],
+    po:['PO Cash Gate','Test an inventory commitment against protected operating cash before approving the PO.'],
+    shopify:['Shopify Data','Bring store data into Brand OS without pretending an export is the same as accounting profit.']
+  };
+  const [title,why]=reasons[view]||['Brand OS Pro','Unlock the operating tools that turn your model into an ongoing decision system.'];
+  return `${head(title,'This is part of the recurring operating layer in Brand OS Pro.','PRO')}<div class="card"><span class="kicker">WHY YOU NEED THIS</span><h3>${title}</h3><p>${why}</p><div class="advice mt"><b>Free shows you the core economics.</b> Pro adds the tools designed for repeated operating decisions: inventory, cash, offers, fulfillment, wholesale and store-data workflows.</div><button class="primary mt" id="upgradeNow">${session?'Upgrade to Pro':'Create an account to upgrade'}</button></div>`
+}
+async function upgradeFlow(){if(!session){showAuth();return}await startBilling()}
+
+
 function onboarding(){
-  const items=[
-    ['Product economics',readyProduct(),'Add retail price + landed cost','profit'],
-    ['CAC guardrail',readyCacFloor(),'Set the contribution floor you refuse to give up','cac'],
-    ['Inventory timing',readyInv(),'Add weekly demand, lead time and on-hand','inventory'],
-    ['Cash protection',readyCash(),'Add current cash + protected operating floor','cash']
+  const core=[
+    ['Product economics',readyProduct(),'Add selling price + landed cost so Brand OS can model one real order.','profit'],
+    ['Acquisition guardrail',readyCacFloor(),'Choose the contribution you want left after acquiring a customer.','cac'],
+    ['Store funnel',readyFunnel(),'Add one consistent date range so drop-off can be measured without guessing at the cause.','funnel']
   ];
+  const operating=[
+    ['Inventory timing',readyInv(),'Use demand + supplier lead time to know when a reorder deserves review.','inventory'],
+    ['Cash protection',readyCash(),'Choose the operating cash floor you do not want a PO or expense to cross.','cash']
+  ];
+  const items=isPro()||mode==='demo'||mode==='demo-edited'?[...core,...operating]:core;
   const done=items.filter(x=>x[1]).length;
-  return `<div class="onboard"><div><span class="kicker">SETUP ${done}/4</span><h2>Build your model before Brand OS judges it.</h2><p>New accounts start blank on purpose. Enter your own numbers, import store data, or load Foundry Eight only when you want a worked demo.</p><div class="sourceLine">${sourceBadge()}</div></div><div class="setupList">${items.map(x=>`<button data-jump="${x[3]}" class="setupItem ${x[1]?'done':''}"><span>${x[1]?'✓':'○'}</span><div><b>${x[0]}</b><small>${x[2]}</small></div></button>`).join('')}</div></div>`
+  const payoff=done===items.length?'Your core model is ready. Brand OS can now interpret the numbers you supplied.':'Complete the steps below so Brand OS can explain what your numbers mean instead of showing empty KPIs.';
+  return `<div class="onboard"><div><span class="kicker">SETUP ${done}/${items.length}</span><h2>Build the model Brand OS will use to guide decisions.</h2><p>${payoff}</p><div class="sourceLine">${sourceBadge()}</div></div><div class="setupList">${items.map(x=>`<button data-jump="${x[3]}" class="setupItem ${x[1]?'done':''}"><span>${x[1]?'✓':'○'}</span><div><b>${x[0]}</b><small>${x[2]}</small></div></button>`).join('')}${!isPro()&&config.billingConfigured?`<div class="setupItem"><span>PRO</span><div><b>Full operating model</b><small>Pro adds inventory, cash, PO, discount, wholesale, 3PL and store-data decision tools after the core setup.</small></div></div>`:''}</div></div>`
 }
 
 function dashboard(){
@@ -76,20 +108,21 @@ function dashboard(){
   const cacKind=readyCac()?(effectiveCac()<=maxcac?'good':effectiveCac()<=maxcac*1.15?'warn':'bad'):'warn';
   const invKind=readyInv()?(im.inventoryPosition>im.reorderPoint?'good':'warn'):'warn';
   const cashKind=readyCash()?(cashx.headroom>=0?'good':'bad'):'warn';
+  const fullOperating=isPro()||mode==='demo'||mode==='demo-edited';
+  const funnelx=funnelMetrics(state);
   const next=nextMoves()[0]||['Finish setup','Enter enough real inputs for Brand OS to make a decision.'];
-  const importBlock=lastImport?`<div class="sectionbar"><h3>Store pulse</h3><span>${sourceBadge('SHOPIFY IMPORT')}</span></div>${renderImport(lastImport,true)}`:'';
+  const importBlock=fullOperating&&lastImport?`<div class="sectionbar"><h3>Store pulse</h3><span>${sourceBadge('SHOPIFY IMPORT')}</span></div>${renderImport(lastImport,true)}`:'';
   return `${onboarding()}<div class="dashboardIntro"><div><span class="kicker">BUSINESS HEALTH</span><h2>See only the numbers you actually supplied.</h2><p>${mode==='demo'?'<b>Demo mode:</b> every number below is the Foundry Eight case, not your brand.':mode==='demo-edited'?'<b>Edited demo:</b> this model still contains Foundry Eight case inputs unless you replace them.':'Blank inputs stay blank. No benchmark or business result is invented for you.'}</p></div><div class="brandchip"><small>Current model</small><b>${mode==='demo'?'Foundry Eight demo':mode==='demo-edited'?'Edited Foundry Eight demo':brands[0]?.name?escapeHtml(brands[0].name):'Local model'}</b></div></div>
   <div class="grid g4">
-    ${metric('Pre-CAC contribution',money(c),`${pct(contributionMarginPct(es))} contribution margin`,missingOrderCosts().length?'warn':'good')}
-    ${metric('Max first-order CAC',maxcac===null?'Set floor':money(maxcac),readyCacFloor()?`Protects ${money(state.requiredPostCac)} after acquisition`:'Needs your contribution floor',readyCacFloor()?'good':'warn')}
-    ${metric('Break-even orders',Number.isFinite(be)?be:'Needs CAC + launch cost',Number.isFinite(be)?`${money(state.fixedLaunchCost)} fixed launch cost`:'Not calculated from missing inputs',Number.isFinite(be)&&state.launchUnits>0&&state.launchUnits>=be?'good':'warn')}
-    ${metric('Reorder review point',readyInv()?Math.ceil(im.reorderPoint)+' units':'Set up inventory',readyInv()?`${im.weeksCover.toFixed(1)} weeks on-hand cover before inbound`:'Needs demand + lead time + on-hand',invKind)}
+    ${metric('Pre-CAC contribution',money(c),`${pct(contributionMarginPct(es))} contribution margin`,missingOrderCosts().length?'warn':'good',{definition:'Money remaining from one modeled order after the variable costs you entered, before customer acquisition.',why:'This is the pool that still has to support acquisition and the rest of the business.',math:'Selling price minus modeled order-level variable costs.',action:'Finish every variable-cost input before using this number to set CAC or discount decisions.',source:sourceBadge()})}
+    ${metric('Max first-order CAC',maxcac===null?'Set floor':money(maxcac),readyCacFloor()?`Protects ${money(state.requiredPostCac)} after acquisition`:'Needs your contribution floor',readyCacFloor()?'good':'warn',{definition:'The most Brand OS says you can spend to acquire a first-order customer while still preserving your chosen post-CAC contribution floor.',why:'It gives your acquisition spending a business-specific ceiling instead of a borrowed benchmark.',math:'Pre-CAC contribution minus your required post-CAC contribution.',action:'Compare observed CAC with this ceiling before increasing acquisition spend.',source:'Your product economics + your chosen contribution floor'})}
+    ${fullOperating?metric('Break-even orders',Number.isFinite(be)?be:'Needs CAC + launch cost',Number.isFinite(be)?`${money(state.fixedLaunchCost)} fixed launch cost`:'Not calculated from missing inputs',Number.isFinite(be)&&state.launchUnits>0&&state.launchUnits>=be?'good':'warn'):metric('Store conversion',readyFunnel()?pct(funnelx.conversionRate):'Set funnel',readyFunnel()?'Completed orders ÷ sessions':'Needs sessions + completed orders',readyFunnel()?'good':'warn',{definition:'The share of store sessions that became completed orders in the period you entered.',why:'It helps you compare your own store periods without pretending one universal conversion benchmark fits every brand.',math:'Completed orders ÷ store sessions.',action:'Compare the same source and date window over time; a change tells you where to investigate, not the cause.',source:'Your funnel inputs'})}
+    ${fullOperating?metric('Reorder review point',readyInv()?Math.ceil(im.reorderPoint)+' units':'Set up inventory',readyInv()?`${im.weeksCover.toFixed(1)} weeks on-hand cover before inbound`:'Needs demand + lead time + on-hand',invKind,{definition:'A planning trigger for reviewing a reorder, not an automatic instruction to buy.',why:'Supplier lead time can make an apparently healthy stock level risky before inventory reaches zero.',math:'Lead-time demand plus any scenario reserve, compared with inventory position.',action:'Review demand quality, cash and supplier terms before converting this trigger into a PO.',source:'Your demand, lead time, on-hand, inbound and allocated units'}):metric('Contribution after CAC',readyCac()?money(pc):'Set CAC',readyCac()?`Required floor: ${money(state.requiredPostCac)}`:'Needs CAC + your contribution floor',profitKind,{definition:'Modeled order contribution after subtracting the acquisition cost you entered.',why:'This is the first-order economics checkpoint before you scale acquisition.',math:'Pre-CAC contribution minus observed or calculated CAC.',action:'If it falls below your own floor, fix price, variable costs, offer depth or CAC before scaling.',source:'Your product economics + CAC'})}
   </div>
   <div class="sectionbar"><h3>What needs attention</h3><span>Decision triggers, not vanity metrics</span></div>
   <div class="healthgrid">
     <div class="healthcard"><div class="healthhead"><b>Profitability</b>${readyCac()?status(profitKind,profitKind==='good'?'HEALTHY':profitKind==='warn'?'WATCH':'FIX'):status('warn','NEEDS CAC')}</div><p>${readyCac()?`Modeled contribution after acquisition is ${money(pc)}.`:`Product economics exist, but acquisition cost is not set yet.`}</p></div>
-    <div class="healthcard"><div class="healthhead"><b>Inventory</b>${readyInv()?status(invKind,invKind==='good'?'ABOVE REVIEW POINT':'REVIEW REORDER'):status('warn','SET UP')}</div><p>${readyInv()?`${Math.ceil(im.inventoryPosition)} units positioned against a ${Math.ceil(im.reorderPoint)}-unit review point.`:'No reorder decision until demand, lead time and on-hand are entered.'}</p></div>
-    <div class="healthcard"><div class="healthhead"><b>Cash</b>${readyCash()?status(cashKind,cashKind==='good'?'ABOVE FLOOR':'BELOW FLOOR'):status('warn','SET UP')}</div><p>${readyCash()?`Quick-check headroom is ${money(cashx.headroom)}${poc?`; proposed PO full-payment headroom is ${money(poc.fullPoHeadroom)}`:''}.`:'No cash judgment until current cash and your protected floor are entered.'}</p></div>
+    ${fullOperating?`<div class="healthcard"><div class="healthhead"><b>Inventory</b>${readyInv()?status(invKind,invKind==='good'?'ABOVE REVIEW POINT':'REVIEW REORDER'):status('warn','SET UP')}</div><p>${readyInv()?`${Math.ceil(im.inventoryPosition)} units positioned against a ${Math.ceil(im.reorderPoint)}-unit review point.`:'No reorder decision until demand, lead time and on-hand are entered.'}</p></div><div class="healthcard"><div class="healthhead"><b>Cash</b>${readyCash()?status(cashKind,cashKind==='good'?'ABOVE FLOOR':'BELOW FLOOR'):status('warn','SET UP')}</div><p>${readyCash()?`Quick-check headroom is ${money(cashx.headroom)}${poc?`; proposed PO lowest modeled headroom is ${money(poc.minimumHeadroom)}`:''}.`:'No cash judgment until current cash and your protected floor are entered.'}</p></div>`:`<div class="healthcard"><div class="healthhead"><b>Acquisition</b>${readyCac()?status(cacKind,cacKind==='good'?'UNDER CEILING':cacKind==='warn'?'NEAR CEILING':'OVER CEILING'):status('warn','SET UP')}</div><p>${readyCac()?`CAC used by the model is ${money(effectiveCac())}; your ceiling is ${money(maxcac)}.`:'Set your contribution floor and CAC to create a brand-specific acquisition guardrail.'}</p></div><div class="healthcard"><div class="healthhead"><b>Funnel</b>${readyFunnel()?status('good','TRACKING'):status('warn','SET UP')}</div><p>${readyFunnel()?`${state.orders} completed orders from ${state.sessions} sessions in the period entered.`:'Use one consistent date range for sessions, carts, checkouts and orders.'}</p></div>`}
   </div>
   ${importBlock}
   <div class="sectionbar"><h3>Next move</h3><span>Highest-priority rule from your model</span></div><div class="decision"><div><span class="kicker">MOTION SUPPLY RECOMMENDATION</span><h3>${next[0]}</h3><p>${next[1]}</p></div><button data-jump="advisor">See all moves →</button></div>
@@ -221,15 +254,17 @@ function cash(){
 }
 
 function po(){
-  const x=readyCash()&&hasInput('proposedUnits')&&hasInput('depositPct')?purchaseOrderGate(state):null,pass=x&&x.fullPoHeadroom>=0;
-  return `${head('PO Cash Gate','Test the proposed inventory commitment against your cash floor before approving it.','Founder Edition Ch. 48 / 74')}<div class="sourceLine">${sourceBadge()}</div>
+  const x=readyCash()&&hasInput('proposedUnits')&&hasInput('depositPct')?purchaseOrderGate(state):null,pass=x&&x.minimumHeadroom>=0;
+  return `${head('PO Cash Gate','Model the deposit today and the remaining supplier payment over time before approving inventory.','Founder Edition Ch. 48 / 74')}<div class="sourceLine">${sourceBadge()}</div>
   <div class="grid g2"><div class="card"><div class="form">
-  ${field('proposedUnits','Proposed units','','1')}${field('landedCost','Landed cost / unit')}${field('depositPct','Deposit %','Enter the actual supplier payment schedule.','1')}
-  <div class="formDivider">SAME PLANNING WINDOW</div>
+  ${field('proposedUnits','Proposed units','','1')}${field('landedCost','Landed cost / unit')}${field('depositPct','Deposit %','Supplier deposit due now.','1')}${field('poBalanceDueWeeks','Balance due in how many weeks?','Timing context for the remaining supplier payment.','.1')}
+  <div class="formDivider">BASE CASH WINDOW</div>
   ${field('cashStart','Starting cash')}${field('expectedInflows','Near-term inflows')}${field('wholesaleReceivable','Wholesale receivable')}${field('committedOutflows','Other committed outflows')}${field('supplierBalance','Existing supplier balances')}${field('payroll','Payroll')}${field('taxReserve','Tax reserve')}${field('processorHold','Processor hold')}${field('protectedFloor','Protected cash floor')}
+  <div class="formDivider">BETWEEN DEPOSIT & BALANCE</div>
+  ${field('poExpectedInflowsBeforeBalance','Additional expected inflows before balance','Only include cash not already counted above. These are estimates.')}${field('poExpectedOutflowsBeforeBalance','Additional outflows before balance','Only include obligations not already counted above.')}
   </div></div><div class="result"><small>PO DECISION</small><div class="big">${x?(pass?'PASS':'HOLD'):'—'}</div>
-  ${row('Cash before proposed PO',x?money(x.baseCash):'—')}${row('PO total',x?money(x.poTotal):'—')}${row('Deposit due',x?money(x.deposit):'—')}${row('Cash after deposit',x?money(x.afterDeposit):'—')}${row('Cash after full PO',x?money(x.afterFullPo):'—')}${row('Full-PO headroom vs floor',x?money(x.fullPoHeadroom):'—')}</div></div>
-  <div class="advice mt"><b>${x?(pass?'Cash gate passes.':'Cash gate does not pass yet.'):'Complete the cash and PO inputs.'}</b>${x?(pass?'This only means the modeled cash floor survives. Demand, size curve, quality and lead time still need approval.':'Reduce units, improve terms, delay the PO, increase available cash, or change the protected floor only if your real operating needs justify it.'):'No decision is shown from missing inputs.'}</div>`
+  ${row('Cash before proposed PO',x?money(x.baseCash):'—')}${row('PO total',x?money(x.poTotal):'—')}${row('Deposit due now',x?money(x.deposit):'—')}${row('Cash after deposit',x?money(x.afterDeposit):'—')}${row('Remaining supplier balance',x?money(x.remainingBalance):'—')}${row(`Cash before balance${x&&x.balanceDueWeeks?` (~${x.balanceDueWeeks} wk)`:''}`,x?money(x.cashBeforeBalance):'—')}${row('Cash after remaining balance',x?money(x.afterBalance):'—')}${row('Lowest modeled headroom vs floor',x?money(x.minimumHeadroom):'—')}</div></div>
+  <div class="advice mt"><b>${x?(pass?'Cash gate passes across the modeled payment timeline.':'Cash gate does not pass across the modeled payment timeline.'):'Complete the cash and PO inputs.'}</b>${x?(pass?'Future inflows are estimates, not guaranteed cash. Confirm demand, supplier terms, taxes, payroll and timing before committing.':'Reduce units, improve supplier terms, delay the PO, increase available cash, or remove optimistic inflows that are not dependable.'):'No decision is shown from missing inputs.'}</div>`
 }
 
 function shopify(){
@@ -243,7 +278,7 @@ function renderImport(x,compact=false){
   const date=x.startDate||x.endDate?`<div class="mini importRange">Export range: ${escapeHtml(x.startDate||'—')} → ${escapeHtml(x.endDate||'—')}</div>`:'';
   return `${date}<div class="grid g4 mt">${metric('Orders in export',x.orderCount,'Unique order names')}${metric('Non-canceled order total',money(x.nonCanceledOrderTotal ?? x.csvOrderTotal),'Order Total field, excluding rows marked canceled')}${metric('Units in line items',x.units,'Line-item quantities')}${metric('Avg exported order total',money(x.averageOrderTotal),'CSV order total ÷ all exported orders')}</div>${compact?'':`<div class="grid g3 mt">${metric('Canceled orders',x.canceledOrders ?? 0)}${metric('Discount amount',money(x.csvDiscountAmount),'Exported order-level discount field')}${metric('Unique customer emails',x.uniqueCustomerEmails)}</div><div class="warning mt"><b>Not Shopify Analytics net sales.</b>This Orders CSV snapshot is an operational export. Returns and sales reversals can differ from Shopify Analytics. Use Transaction history for captured/refunded payment cash and Shopify Analytics for official net-sales reporting.</div><div class="table mt"><table><thead><tr><th>Top SKU / item</th><th>Units</th><th>Line-item value</th></tr></thead><tbody>${x.topSkus.map(s=>`<tr><td>${escapeHtml(s.sku)}</td><td>${s.units}</td><td>${money(s.value)}</td></tr>`).join('')}</tbody></table></div>`}`
 }
-function brandsView(){if(!session)return `${head('Brands & SKUs','Cloud saving needs an account. Calculators still work locally.','Secure cloud storage')}<div class="card"><p>Sign in to save brands and SKUs. Account traffic is proxied through the Brand OS server so the browser does not depend on a third-party CDN connection.</p><button class="primary" id="inlineSignIn">Sign in</button></div>`;return `${head('Brands & SKUs','Save basic product economics under your account.','Owner-scoped cloud rows')}<div class="card"><div class="split"><input id="brandName" placeholder="Brand name" style="flex:1;padding:11px;border:1px solid #ccc;border-radius:8px"><button id="addBrand" class="primary">Add brand</button></div></div><div class="grid g2 mt">${brands.map(b=>`<div class="card"><div class="skuBar"><div><b>${escapeHtml(b.name)}</b><div class="mini">${escapeHtml(b.currency)}</div></div></div><hr style="border:0;border-top:1px solid #eee"><div class="mini">${skus.filter(s=>s.brand_id===b.id).length} saved SKUs</div><div class="split" style="margin-top:10px"><input id="sku-${b.id}" placeholder="SKU" style="width:90px;padding:8px"><input id="name-${b.id}" placeholder="Product" style="flex:1;padding:8px"><input id="price-${b.id}" type="number" min="0" step=".01" placeholder="Retail $" style="width:110px;padding:8px"><button data-addsku="${b.id}" class="outline">Add</button></div>${skus.filter(s=>s.brand_id===b.id).map(s=>`<div class="row"><span>${escapeHtml(s.sku)} · ${escapeHtml(s.name)}</span><b>${money(s.retail_price)}</b></div>`).join('')}</div>`).join('')||'<div class="card">No brands yet.</div>'}</div>`}
+function brandsView(){if(!session)return `${head('Brands & SKUs','Cloud saving needs an account. Calculators still work locally.','Secure cloud storage')}<div class="card"><p>Sign in to save brands and SKUs. Account traffic is proxied through the Brand OS server so the browser does not depend on a third-party CDN connection.</p><button class="primary" id="inlineSignIn">Sign in</button></div>`;const brandLimit=entitlement.limits?.brands,skuLimit=entitlement.limits?.skus,brandMaxed=!isPro()&&Number.isFinite(brandLimit)&&brands.length>=brandLimit,skuMaxed=!isPro()&&Number.isFinite(skuLimit)&&skus.length>=skuLimit;return `${head('Brands & SKUs','Save basic product economics under your account.','Owner-scoped cloud rows')}<div class="card"><div class="mini">${isPro()?'Pro: unlimited saved brands and SKUs.':`Free: ${brands.length}/${brandLimit??1} brand and ${skus.length}/${skuLimit??5} SKUs saved.`}</div>${brandMaxed?`<div class="advice mt"><b>Free brand limit reached.</b>Upgrade to Pro for unlimited brands and SKUs.</div>`:`<div class="split mt"><input id="brandName" placeholder="Brand name" style="flex:1;padding:11px;border:1px solid #ccc;border-radius:8px"><button id="addBrand" class="primary">Add brand</button></div>`}</div><div class="grid g2 mt">${brands.map(b=>`<div class="card"><div class="skuBar"><div><b>${escapeHtml(b.name)}</b><div class="mini">${escapeHtml(b.currency)}</div></div></div><hr style="border:0;border-top:1px solid #eee"><div class="mini">${skus.filter(s=>s.brand_id===b.id).length} saved SKUs</div>${skuMaxed?`<div class="mini mt">Free SKU limit reached.</div>`:`<div class="split" style="margin-top:10px"><input id="sku-${b.id}" placeholder="SKU" style="width:90px;padding:8px"><input id="name-${b.id}" placeholder="Product" style="flex:1;padding:8px"><input id="price-${b.id}" type="number" min="0" step=".01" placeholder="Retail $" style="width:110px;padding:8px"><button data-addsku="${b.id}" class="outline">Add</button></div>`}${skus.filter(s=>s.brand_id===b.id).map(s=>`<div class="row"><span>${escapeHtml(s.sku)} · ${escapeHtml(s.name)}</span><b>${money(s.retail_price)}</b></div>`).join('')}</div>`).join('')||'<div class="card">No brands yet.</div>'}</div>`}
 
 
 async function addBrand(){
@@ -294,36 +329,37 @@ function nextMoves(){
   else if(pc<=0) out.push(['Stop scaling acquisition','The modeled acquired order loses contribution. Fix price, variable cost, offer or CAC first.']);
   else if(effectiveCac()>mx+0.005) out.push(['Bring CAC back under the ceiling',`Modeled CAC ${money(effectiveCac())} is above the ${money(mx)} ceiling created by your own contribution floor.`]);
 
-  if(readyCash()&&cashx.headroom<0) out.push(['Protect cash',`${money(Math.abs(cashx.headroom))} below the protected floor in the quick checkpoint.`]);
-  if(poc&&poc.fullPoHeadroom<0) out.push(['Hold the proposed PO',`Full payment would put cash ${money(Math.abs(poc.fullPoHeadroom))} below the protected floor.`]);
-  if(readyInv()&&im.inventoryPosition<=im.reorderPoint) out.push(['Review the next reorder',`${Math.ceil(im.inventoryPosition)} units positioned vs ${Math.ceil(im.reorderPoint)} review point. Confirm demand quality and cash before ordering.`]);
+  const fullOperating=isPro()||mode==='demo'||mode==='demo-edited';
+  if(fullOperating&&readyCash()&&cashx.headroom<0) out.push(['Protect cash',`${money(Math.abs(cashx.headroom))} below the protected floor in the quick checkpoint.`]);
+  if(fullOperating&&poc&&poc.minimumHeadroom<0) out.push(['Hold the proposed PO',`The modeled payment timeline falls ${money(Math.abs(poc.minimumHeadroom))} below the protected cash floor at its lowest point.`]);
+  if(fullOperating&&readyInv()&&im.inventoryPosition<=im.reorderPoint) out.push(['Review the next reorder',`${Math.ceil(im.inventoryPosition)} units positioned vs ${Math.ceil(im.reorderPoint)} review point. Confirm demand quality and cash before ordering.`]);
 
   if(readyCac()&&pc>0&&effectiveCac()<=mx+0.005&&out.length===0) out.push(['Protect the economics',`Modeled first-order contribution after acquisition is ${money(pc)}. Keep watching cost, discount depth and CAC rather than chasing revenue alone.`]);
 
   const n3=hasInput('monthlyOrders')&&state.monthlyOrders>0&&hasInput('inhouseFulfillment')&&hasInput('thirdPartyVariable')&&hasInput('thirdPartyMonthly')?normalized3pl(state):Infinity;
-  if(Number.isFinite(n3)&&n3<state.inhouseFulfillment) out.push(['Review the 3PL quote in detail','The cost-only model favors the 3PL at this volume; service levels and transition risk still need review.']);
-  if(lastImport?.kind==='orders'&&lastImport.orderCount>0) out.push(['Review the store pulse',`${lastImport.orderCount} orders are loaded from your latest Shopify Orders CSV. Compare this period against another period before calling a trend.`]);
+  if(fullOperating&&Number.isFinite(n3)&&n3<state.inhouseFulfillment) out.push(['Review the 3PL quote in detail','The cost-only model favors the 3PL at this volume; service levels and transition risk still need review.']);
+  if(fullOperating&&lastImport?.kind==='orders'&&lastImport.orderCount>0) out.push(['Review the store pulse',`${lastImport.orderCount} orders are loaded from your latest Shopify Orders CSV. Compare this period against another period before calling a trend.`]);
   return out
 }
-function advisor(){const out=nextMoves();return `${head('Next Move Advisor','Rule-based operating prompts from your inputs. These are not forecasts and they do not replace judgment.','Motion Supply operating logic')}<div class="grid g2">${out.map((x,i)=>`<div class="card"><span class="kicker">MOVE ${i+1}</span><h3>${x[0]}</h3><p>${x[1]}</p></div>`).join('')}</div>`}
+function advisor(){const out=nextMoves(),fullOperating=isPro()||mode==='demo'||mode==='demo-edited';return `${head('Next Move Advisor','Rule-based operating prompts from your inputs. These are not forecasts and they do not replace judgment.','Motion Supply operating logic')}<div class="grid g2">${out.map((x,i)=>`<div class="card"><span class="kicker">MOVE ${i+1}</span><h3>${x[0]}</h3><p>${x[1]}</p></div>`).join('')}${!fullOperating&&config.billingConfigured?`<div class="card"><span class="kicker">PRO OPERATING LAYER</span><h3>Unlock inventory, cash and PO recommendations</h3><p>Free Advisor covers core product economics and acquisition. Pro adds operating recommendations from inventory, cash, fulfillment and store-data decisions.</p><button class="primary mt" id="upgradeNow">Upgrade to Pro</button></div>`:''}</div>`}
 
 function escapeHtml(s){return String(s??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}
-function render(){ const title=$('#title'),app=$('#app');if(title)title.textContent=views[current];if(!app)return;const map={dashboard,profit,cac,funnel,discount,inventory,wholesale,launch,fulfillment,cash,po,shopify,brands:brandsView,advisor};app.innerHTML=map[current]();bind();updateAccount() }
+function render(){ const title=$('#title'),app=$('#app');if(title)title.textContent=views[current];if(!app)return;const map={dashboard,profit,cac,funnel,discount,inventory,wholesale,launch,fulfillment,cash,po,shopify,brands:brandsView,advisor};app.innerHTML=isProLocked(current)?proGate(current):map[current]();bind();updateAccount() }
 
 function bind(){
   document.querySelectorAll('[data-key]').forEach(el=>el.onchange=e=>{
     const key=e.target.dataset.key,raw=e.target.value;
     if(raw===''){touched.delete(key);state[key]=0}else{touched.add(key);state[key]=Number(raw)}
-    mode=mode==='demo'||mode==='demo-edited'?'demo-edited':'fresh';save();render()
+    mode=mode==='demo'||mode==='demo-edited'?'demo-edited':'fresh';save();if(readyProduct())trackOnce('first_calculation_completed');render()
   });
   document.querySelectorAll('[data-jump]').forEach(el=>el.onclick=()=>jumpTo(el.dataset.jump));
   const f=$('#csvFile');if(f)f.onchange=handleCsv;
   const c=$('#clearImport');if(c)c.onclick=()=>{lastImport=null;save();render()};
   const s=$('#inlineSignIn');if(s)s.onclick=showAuth;
-  const ab=$('#addBrand');if(ab)ab.onclick=addBrand;
+  const ab=$('#addBrand');if(ab)ab.onclick=addBrand;const up=$('#upgradeNow');if(up)up.onclick=upgradeFlow;
   document.querySelectorAll('[data-addsku]').forEach(b=>b.onclick=()=>addSku(b.dataset.addsku))
 }
-function jumpTo(view){current=view;document.querySelectorAll('#nav button').forEach(x=>x.classList.toggle('active',x.dataset.view===view));$('#side')?.classList.remove('open');render();scrollTo(0,0)}
+function jumpTo(view){track('tool_opened',{view});if(isProLocked(view)){const k=`pro_page_viewed_${view}`;if(!tracked[k]){tracked[k]=true;localStorage.setItem('msbo_tracked_events',JSON.stringify(tracked));track('pro_page_viewed',{view})}}current=view;document.querySelectorAll('#nav button').forEach(x=>x.classList.toggle('active',x.dataset.view===view));$('#side')?.classList.remove('open');render();scrollTo(0,0)}
 async function handleCsv(e){
   const file=e.target.files[0];if(!file)return;
   if(session&&!entitlement.active&&config.billingConfigured){alert('Shopify CSV dashboard is a Pro feature for signed-in users.');return}
@@ -335,9 +371,9 @@ async function handleCsv(e){
   }catch(err){alert(err.message)}
 }
 function showAuth(){if(!config.authConfigured)return alert('Account service is not fully configured on this deployment yet.');if(session)return showAccount();showModal(`<h2>Sign in / create account</h2><div class="authform"><input id="email" type="email" placeholder="Email"><input id="password" type="password" placeholder="Password (6+ characters)"><div id="authMsg" class="mini"></div><div class="split"><button id="signin" class="primary">Sign in</button><button id="signup" class="outline">Create account</button></div></div>`);$('#signin').onclick=()=>auth('signin');$('#signup').onclick=()=>auth('signup')}
-async function auth(kind){const email=$('#email').value.trim(),password=$('#password').value,msg=$('#authMsg');msg.textContent='Working…';try{const x=await api(`/api/auth/${kind}`,'POST',{email,password});if(x.confirmationRequired){msg.textContent='Account created. Check your email to confirm, then sign in.';return}storeSession(x.session);hideModal();await refreshAccount();render()}catch(e){msg.textContent=e.message}}
+async function auth(kind){if(kind==='signup')track('signup_started');const email=$('#email').value.trim(),password=$('#password').value,msg=$('#authMsg');msg.textContent='Working…';try{const x=await api(`/api/auth/${kind}`,'POST',{email,password});if(x.confirmationRequired){msg.textContent='Account created. Check your email to confirm, then sign in.';return}storeSession(x.session);if(kind==='signup')track('signup_completed');hideModal();await refreshAccount();render()}catch(e){msg.textContent=e.message}}
 function showAccount(){showModal(`<h2>Account</h2><p>${escapeHtml(session?.user?.email||'Signed in')}</p><p>Plan: <b>${entitlement.plan.toUpperCase()}</b></p><div class="split"><button id="signout" class="outline">Sign out</button>${config.billingConfigured?`<button id="acctBilling" class="primary">${entitlement.active?'Manage billing':'Upgrade to Pro'}</button>`:''}</div>`);$('#signout').onclick=()=>{storeSession(null);brands=[];skus=[];hideModal();refreshAccount();render()};const b=$('#acctBilling');if(b)b.onclick=startBilling}
-async function startBilling(){try{const endpoint=entitlement.active?'/api/create-portal-session':'/api/create-checkout-session';const x=await api(endpoint,'POST',{},true);location.href=x.url}catch(e){alert(e.message)}}
+async function startBilling(){try{if(!entitlement.active)track('checkout_started');const endpoint=entitlement.active?'/api/create-portal-session':'/api/create-checkout-session';const x=await api(endpoint,'POST',{},true);location.href=x.url}catch(e){alert(e.message)}}
 function showModal(html){$('#modalBody').innerHTML=html;$('#modal').classList.remove('hidden')}function hideModal(){$('#modal').classList.add('hidden')}
 function loadFoundryDemo(){
   state=clone(FOUNDRY_EIGHT);

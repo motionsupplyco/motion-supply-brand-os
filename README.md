@@ -148,3 +148,8 @@ Complete these launch tasks:
 - Dashboard metrics are decision-led: profitability, acquisition, inventory, cash, and store data.
 - Imported Shopify metrics are labeled as source data and remain separate from manual planning assumptions.
 - Demo data is visually labeled `DEMO CASE` and never auto-loads.
+
+
+## V5.5 foundation sprint
+
+See `docs/V5_5_RELEASE_NOTES.md` and run `sql/v5_5_migration.sql` before deploying V5.5 to an existing Supabase project.

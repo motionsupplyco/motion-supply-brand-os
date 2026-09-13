@@ -34,3 +34,5 @@
   line-height: 1.2;
   flex-shrink: 0;
 }
+
+.metricDetails{margin-top:10px;border-top:1px solid var(--line);padding-top:8px}.metricDetails summary{cursor:pointer;font-size:10px;font-weight:800;color:#765721}.metricDetails p{margin:7px 0;line-height:1.45}.metricDetails .sourceTag{font-size:8px;padding:3px 6px}
