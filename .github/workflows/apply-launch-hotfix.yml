@@ -1,0 +1,26 @@
+name: Apply launch hotfix
+on:
+  push:
+    branches: [p0-production-hardening]
+    paths: ['.github/workflows/apply-launch-hotfix.yml']
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: p0-production-hardening
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node scripts/apply-launch-hotfix.mjs
+      - run: npm test
+      - name: Commit verified hotfix
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add server.js public/app.js tests/recovery-contract.test.js tests/route-regression-contract.test.js
+          git commit -m "Fix recovery update and add brand deletion"
+          git push origin HEAD:p0-production-hardening
