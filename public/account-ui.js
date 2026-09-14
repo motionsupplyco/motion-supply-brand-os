@@ -23,10 +23,12 @@ async function request(url,method='GET',body,auth=false){
 function formatDate(value){if(!value)return null;const d=new Date(value);return Number.isNaN(d.getTime())?null:d.toLocaleDateString(undefined,{year:'numeric',month:'short',day:'numeric'})}
 function legalLinks(config){
   const links=[];
-  if(config?.privacyUrl)links.push(`<a href="${escapeHtml(config.privacyUrl)}" target="_blank" rel="noopener">Privacy</a>`);
-  if(config?.termsUrl)links.push(`<a href="${escapeHtml(config.termsUrl)}" target="_blank" rel="noopener">Terms</a>`);
+  const privacyUrl=config?.privacyUrl||'/privacy.html';
+  const termsUrl=config?.termsUrl||'/terms.html';
+  links.push(`<a href="${escapeHtml(privacyUrl)}" target="_blank" rel="noopener">Privacy</a>`);
+  links.push(`<a href="${escapeHtml(termsUrl)}" target="_blank" rel="noopener">Terms</a>`);
   if(config?.supportUrl)links.push(`<a href="${escapeHtml(config.supportUrl)}" target="_blank" rel="noopener">Support</a>`);
-  return links.length?`<p class="mini mt">${links.join(' · ')}</p>`:''
+  return `<p class="mini mt">${links.join(' · ')}</p>`
 }
 
 async function showSignIn(){
