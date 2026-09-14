@@ -71,7 +71,9 @@ test('P0 billing lifecycle persists cancellation, trial, invoice, and atomic web
   assert.match(webhookState,/status:'completed'/);
   assert.match(webhookState,/status:'failed'/);
   assert.match(webhookMigration,/create or replace function public\.claim_stripe_webhook_event/);
-  assert.match(webhookMigration,/on conflict \(event_id\) do nothing/);
+  assert.match(webhookMigration,/on conflict \(event_id\) do update/);
+  assert.match(webhookMigration,/status = 'failed'/);
+  assert.match(webhookMigration,/claimed_at < now\(\) - interval '15 minutes'/);
   assert.match(webhookMigration,/revoke all on function public\.claim_stripe_webhook_event/);
   assert.match(webhookRetryMigration,/add column if not exists claimed_at timestamptz not null default now\(\)/);
   assert.match(webhookRetryMigration,/on conflict \(event_id\) do update/);
