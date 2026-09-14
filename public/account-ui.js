@@ -125,6 +125,8 @@ async function deleteAccount(){
 // Capture these clicks before app.js so this production account surface owns the account UX.
 document.addEventListener('click',e=>{
   if(e.target.closest('#authBtn')){e.preventDefault();e.stopImmediatePropagation();showAccount();return}
+  if(e.target.closest('#inlineSignIn')){e.preventDefault();e.stopImmediatePropagation();showSignIn();return}
+  if(e.target.closest('#upgradeNow')&&!loadSession()){e.preventDefault();e.stopImmediatePropagation();showSignIn();return}
 },true);
 
 function initRecovery(){captureRecoverySession()}
