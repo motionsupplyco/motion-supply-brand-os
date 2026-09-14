@@ -3,8 +3,10 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 
 const server=await readFile(new URL('../server.js',import.meta.url),'utf8');
+const webhookState=await readFile(new URL('../lib/stripe-webhook-state.js',import.meta.url),'utf8');
 const schema=await readFile(new URL('../sql/schema.sql',import.meta.url),'utf8');
 const p0=await readFile(new URL('../sql/p0_production_migration.sql',import.meta.url),'utf8');
+const webhookMigration=await readFile(new URL('../sql/p0_webhook_idempotency.sql',import.meta.url),'utf8');
 const deletionAuditFix=await readFile(new URL('../sql/p0_account_deletion_audit_fix.sql',import.meta.url),'utf8');
 
 test('paid cloud features have server-side entitlement enforcement',()=>{
@@ -32,14 +34,23 @@ test('product analytics is server-written and has an explicit event allowlist',(
   assert.match(schema,/revoke all on public\.product_events from authenticated/);
 });
 
-test('P0 billing lifecycle persists cancellation, trial, invoice, and webhook idempotency state',()=>{
+test('P0 billing lifecycle persists cancellation, trial, invoice, and atomic webhook idempotency state',()=>{
   assert.match(p0,/cancel_at_period_end boolean/);
   assert.match(p0,/trial_end timestamptz/);
   assert.match(p0,/latest_invoice_status text/);
   assert.match(p0,/create table if not exists public\.stripe_webhook_events/);
   assert.match(server,/invoice\.payment_failed/);
   assert.match(server,/invoice\.paid/);
-  assert.match(server,/stripe_webhook_events/);
+  assert.match(server,/claimStripeWebhook\(admin,event\)/);
+  assert.match(server,/completeStripeWebhook\(admin,event\.id\)/);
+  assert.match(server,/failStripeWebhook\(admin,event\.id,e\)/);
+  assert.doesNotMatch(server,/select\('event_id'\).*maybeSingle\(\).*duplicate/s);
+  assert.match(webhookState,/rpc\('claim_stripe_webhook_event'/);
+  assert.match(webhookState,/status:'completed'/);
+  assert.match(webhookState,/status:'failed'/);
+  assert.match(webhookMigration,/create or replace function public\.claim_stripe_webhook_event/);
+  assert.match(webhookMigration,/on conflict \(event_id\) do nothing/);
+  assert.match(webhookMigration,/revoke all on function public\.claim_stripe_webhook_event/);
   assert.match(server,/cancel_at_period_end/);
 });
 
