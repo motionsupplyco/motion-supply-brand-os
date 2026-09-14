@@ -1,0 +1,59 @@
+name: Repair header billing recovery
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'p0-production-hardening'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+      - name: Patch main app billing recovery routing
+        shell: python
+        run: |
+          from pathlib import Path
+          p=Path('public/app.js')
+          text=p.read_text()
+          reps=[
+            ("let config={authConfigured:false,cloudConfigured:false,billingConfigured:false},session=loadSession(),entitlement={plan:'free',active:false,limits:{brands:1,skus:5},usage:{brands:0,skus:0}};",
+             "let config={authConfigured:false,cloudConfigured:false,billingConfigured:false},session=loadSession(),entitlement={plan:'free',active:false,billingManageable:false,limits:{brands:1,skus:5},usage:{brands:0,skus:0}};"),
+            ("entitlement={plan:config.authConfigured?'free':'local',active:false,limits:{brands:1,skus:5},usage:{brands:0,skus:0}};",
+             "entitlement={plan:config.authConfigured?'free':'local',active:false,billingManageable:false,limits:{brands:1,skus:5},usage:{brands:0,skus:0}};"),
+            ("entitlement={plan:acct.plan,active:acct.active,limits:acct.limits||{brands:1,skus:5},usage:acct.usage||{brands:0,skus:0}};",
+             "entitlement={plan:acct.plan,active:acct.active,billingManageable:Boolean(acct.billingManageable),limits:acct.limits||{brands:1,skus:5},usage:acct.usage||{brands:0,skus:0}};"),
+            ("entitlement={plan:'free',active:false,limits:{brands:1,skus:5},usage:{brands:0,skus:0}}",
+             "entitlement={plan:'free',active:false,billingManageable:false,limits:{brands:1,skus:5},usage:{brands:0,skus:0}}"),
+            ("$('#billingBtn').textContent=entitlement.active?'Billing':'Upgrade'",
+             "$('#billingBtn').textContent=(entitlement.active||entitlement.billingManageable)?'Billing':'Upgrade'"),
+            ("${entitlement.active?'Manage billing':'Upgrade to Pro'}",
+             "${(entitlement.active||entitlement.billingManageable)?'Manage billing':'Upgrade to Pro'}"),
+            ("async function startBilling(){try{if(!entitlement.active)track('checkout_started');const endpoint=entitlement.active?'/api/create-portal-session':'/api/create-checkout-session';const x=await api(endpoint,'POST',{},true);location.href=x.url}catch(e){alert(e.message)}}",
+             "async function startBilling(){try{const manage=Boolean(entitlement.active||entitlement.billingManageable);if(!manage)track('checkout_started');const endpoint=manage?'/api/create-portal-session':'/api/create-checkout-session';const x=await api(endpoint,'POST',{},true);location.href=x.url}catch(e){alert(e.message)}}")
+          ]
+          for old,new in reps:
+            if new in text:
+              continue
+            assert old in text, f'anchor changed: {old[:80]}'
+            text=text.replace(old,new)
+          p.write_text(text)
+      - name: Verify syntax
+        run: node --check public/app.js
+      - name: Commit patch if needed
+        run: |
+          if git diff --quiet -- public/app.js; then
+            echo "main app billing recovery already patched"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/app.js
+          git commit -m "Keep header billing recovery state in sync"
+          git push origin HEAD:${{ github.head_ref }}
