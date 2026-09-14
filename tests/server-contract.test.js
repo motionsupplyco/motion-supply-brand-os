@@ -8,6 +8,8 @@ const schema=await readFile(new URL('../sql/schema.sql',import.meta.url),'utf8')
 const p0=await readFile(new URL('../sql/p0_production_migration.sql',import.meta.url),'utf8');
 const webhookMigration=await readFile(new URL('../sql/p0_webhook_idempotency.sql',import.meta.url),'utf8');
 const deletionAuditFix=await readFile(new URL('../sql/p0_account_deletion_audit_fix.sql',import.meta.url),'utf8');
+const memoryUi=await readFile(new URL('../public/business-memory-ui.js',import.meta.url),'utf8');
+const indexHtml=await readFile(new URL('../public/index.html',import.meta.url),'utf8');
 
 test('paid cloud features have server-side entitlement enforcement',()=>{
   assert.match(server,/requireProUser\(req,res\)/);
@@ -25,6 +27,21 @@ test('operating memory and recommendation history exist in the database contract
   assert.match(p0,/create table if not exists public\.business_memory/);
   assert.match(p0,/business memory pro rows/);
   assert.match(p0,/enable row level security/);
+});
+
+test('Business Memory UI is wired, Pro-gated, scoped, and preserves scope after writes',()=>{
+  assert.match(indexHtml,/id="memoryNav"/);
+  assert.match(indexHtml,/src="business-memory-ui\.js"/);
+  assert.match(memoryUi,/request\('\/api\/business-memory'\)/);
+  assert.match(memoryUi,/request\('\/api\/brands'\)/);
+  assert.match(memoryUi,/e\.status===402/);
+  assert.match(memoryUi,/Business Memory is a Pro feature/);
+  assert.match(memoryUi,/brand_id:scope\|\|null/);
+  assert.match(memoryUi,/PUT',\{brand_id:scope\|\|null,value:\{text\}\}/);
+  assert.match(memoryUi,/DELETE'/);
+  assert.match(memoryUi,/renderBusinessMemory\(scope\)/);
+  assert.match(memoryUi,/validScope=initialScope&&brands\.some/);
+  assert.match(memoryUi,/Calculators should still use current inputs and imported data for math/);
 });
 
 test('product analytics is server-written and has an explicit event allowlist',()=>{
