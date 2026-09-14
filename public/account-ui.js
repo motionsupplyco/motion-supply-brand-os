@@ -54,6 +54,43 @@ async function forgotPassword(){
   try{const data=await request('/api/auth/recover','POST',{email});if(msg)msg.textContent=data.message||'If that account exists, a recovery email has been sent.'}catch(e){if(msg)msg.textContent=e.message}
 }
 
+function showResetPassword(){
+  modal(`<h2>Choose a new password</h2><p class="mini">Enter a new password for your Brand OS account.</p><div class="authform"><input id="acctNewPassword" type="password" autocomplete="new-password" placeholder="New password (8+ characters)"><input id="acctNewPassword2" type="password" autocomplete="new-password" placeholder="Confirm new password"><button id="acctSetPassword" class="primary">Update password</button><div id="acctResetMsg" class="mini"></div></div>`);
+  $('#acctSetPassword').onclick=completePasswordReset;
+}
+
+async function completePasswordReset(){
+  const password=$('#acctNewPassword')?.value||'',confirm=$('#acctNewPassword2')?.value||'',msg=$('#acctResetMsg');
+  if(password.length<8){if(msg)msg.textContent='Use at least 8 characters.';return}
+  if(password!==confirm){if(msg)msg.textContent='Passwords do not match.';return}
+  if(msg)msg.textContent='Updating password…';
+  try{
+    await request('/api/auth/update-password','POST',{password},true);
+    if(msg)msg.textContent='Password updated. You can continue using Brand OS.';
+    history.replaceState({},document.title,location.pathname);
+    setTimeout(()=>location.reload(),500);
+  }catch(e){if(msg)msg.textContent=e.message}
+}
+
+function captureRecoverySession(){
+  const query=new URLSearchParams(location.search),hash=new URLSearchParams(location.hash.slice(1));
+  const isRecovery=query.get('reset')==='1'||hash.get('type')==='recovery';
+  if(!isRecovery)return false;
+  const accessToken=hash.get('access_token'),refreshToken=hash.get('refresh_token');
+  if(accessToken){
+    const expiresIn=Number(hash.get('expires_in')||0);
+    storeSession({access_token:accessToken,refresh_token:refreshToken||'',token_type:hash.get('token_type')||'bearer',expires_in:expiresIn,expires_at:expiresIn?Math.floor(Date.now()/1000)+expiresIn:null,user:null});
+    history.replaceState({},document.title,`${location.pathname}?reset=1`);
+  }
+  if(!loadSession()?.access_token){
+    modal(`<h2>Recovery link expired</h2><p class="mini">This recovery link is missing a valid session. Request a new password reset email.</p><button id="acctRecoveryClose" class="outline">Close</button>`);
+    $('#acctRecoveryClose').onclick=closeModal;
+    return true
+  }
+  showResetPassword();
+  return true
+}
+
 async function showAccount(){
   const session=loadSession();if(!session)return showSignIn();
   let config={},account={},entitlement={};
@@ -85,3 +122,6 @@ async function deleteAccount(){
 document.addEventListener('click',e=>{
   if(e.target.closest('#authBtn')){e.preventDefault();e.stopImmediatePropagation();showAccount();return}
 },true);
+
+function initRecovery(){captureRecoverySession()}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initRecovery,{once:true});else initRecovery();
