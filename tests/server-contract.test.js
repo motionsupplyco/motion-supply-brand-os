@@ -5,6 +5,7 @@ import {readFile} from 'node:fs/promises';
 const server=await readFile(new URL('../server.js',import.meta.url),'utf8');
 const schema=await readFile(new URL('../sql/schema.sql',import.meta.url),'utf8');
 const p0=await readFile(new URL('../sql/p0_production_migration.sql',import.meta.url),'utf8');
+const deletionAuditFix=await readFile(new URL('../sql/p0_account_deletion_audit_fix.sql',import.meta.url),'utf8');
 
 test('paid cloud features have server-side entitlement enforcement',()=>{
   assert.match(server,/requireProUser\(req,res\)/);
@@ -42,12 +43,16 @@ test('P0 billing lifecycle persists cancellation, trial, invoice, and webhook id
   assert.match(server,/cancel_at_period_end/);
 });
 
-test('account lifecycle includes password recovery and authenticated deletion',()=>{
+test('account lifecycle includes complete password recovery and authenticated deletion',()=>{
   assert.match(server,/app\.post\('\/api\/auth\/recover'/);
   assert.match(server,/resetPasswordForEmail/);
+  assert.match(server,/app\.post\('\/api\/auth\/update-password'/);
+  assert.match(server,/admin\.auth\.admin\.updateUserById/);
   assert.match(server,/app\.delete\('\/api\/account'/);
   assert.match(server,/admin\.auth\.admin\.deleteUser/);
+  assert.match(server,/status:'completed',completed_at:new Date\(\)\.toISOString\(\)/);
   assert.match(p0,/create table if not exists public\.account_deletion_requests/);
+  assert.match(deletionAuditFix,/drop constraint if exists account_deletion_requests_user_id_fkey/);
 });
 
 test('security contract includes request IDs, CSP, no-store API responses, and rate limits',()=>{
