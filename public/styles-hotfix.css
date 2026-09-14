@@ -22,8 +22,10 @@
   margin-top:18px;
   padding-bottom:18px;
 }
-
-/* Keep the application from creating page-level horizontal scroll. */
+.navgroup{margin:12px 10px 3px;color:#6f7580;font-size:8px;font-weight:900;letter-spacing:.18em;text-transform:uppercase}
+.navgroup:first-child{margin-top:2px}
+#learnBtn{margin-top:10px;border-color:#5c4b2b;background:linear-gradient(180deg,#1d1a14,#17150f);color:#f1dca5}
+#learnBtn:hover{background:#241f15;border-color:#8a6b32;color:#fff}
 html,body{max-width:100%;overflow-x:hidden}
 main,.view,.card,.result,.metric,.healthcard,.actioncard{min-width:0}
 img,svg,video,canvas{max-width:100%;height:auto}
@@ -31,70 +33,60 @@ img,svg,video,canvas{max-width:100%;height:auto}
 .account button,.account .pill{white-space:nowrap}
 .split{flex-wrap:wrap}
 .skuBar{flex-wrap:wrap}
-
+body.helpOpen{overflow:hidden}
+#helpRoot{display:none;position:fixed;inset:0;z-index:80}
+#helpRoot.open{display:block}
+.helpBackdrop{position:absolute;inset:0;background:rgba(7,9,12,.72);backdrop-filter:blur(5px)}
+.helpPanel{position:absolute;top:0;right:0;width:min(760px,94vw);height:100%;overflow:auto;background:#f8f5ee;color:#15171b;box-shadow:-24px 0 70px rgba(0,0,0,.3);padding:26px 28px 34px}
+.helpTop{display:flex;justify-content:space-between;gap:24px;align-items:flex-start;padding-bottom:20px;border-bottom:1px solid #ded7ca}
+.helpTop h2{font-size:34px;letter-spacing:-.045em;margin:5px 0 7px}
+.helpTop p{max-width:600px;margin:0;color:#6e6a62;line-height:1.55;font-size:13px}
+.helpKicker{font-size:9px;letter-spacing:.2em;font-weight:900;color:#9a7538}
+.helpClose{border:0;background:#15171b;color:#fff;width:36px;height:36px;border-radius:50%;font-size:23px;line-height:1;cursor:pointer;flex:0 0 auto}
+.helpHero{margin:20px 0;background:linear-gradient(135deg,#111319,#20242c);color:#fff;border-radius:18px;padding:22px;box-shadow:0 16px 40px rgba(17,19,25,.14)}
+.helpHero span{display:block;font-size:9px;letter-spacing:.2em;color:#d2b36d;font-weight:900}
+.helpHero b{display:block;font-size:21px;letter-spacing:-.02em;margin:8px 0 5px}
+.helpHero p{margin:0;color:#b7bdc6;font-size:12px;line-height:1.55}
+.helpSection{padding:22px 0;border-top:1px solid #e1dbd0}
+.helpSectionHead{display:grid;grid-template-columns:38px 1fr;gap:10px;align-items:start;margin-bottom:14px}
+.helpSectionHead>span{width:30px;height:30px;border-radius:9px;background:#eadfca;color:#735421;display:grid;place-items:center;font-size:10px;font-weight:950}
+.helpSectionHead h3{font-size:18px;margin:2px 0 4px;letter-spacing:-.02em}
+.helpSectionHead p{font-size:11px;color:#777168;margin:0;line-height:1.45}
+.helpWorkspaceGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.helpWorkspace{background:#fff;border:1px solid #e0d9cc;border-radius:13px;padding:14px;box-shadow:0 10px 25px rgba(30,25,15,.04)}
+.helpWorkspace b{display:block;font-size:10px;letter-spacing:.12em;color:#845f25;margin-bottom:6px}
+.helpWorkspace span{font-size:12px;line-height:1.4;color:#36383d}
+.helpTools{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.helpTool{background:#fff;border:1px solid #e2dbcf;border-radius:14px;padding:15px;position:relative;box-shadow:0 8px 24px rgba(20,18,12,.035)}
+.helpTool>div{display:flex;gap:9px;align-items:center}
+.helpTool h3{margin:0;font-size:14px;letter-spacing:-.01em}
+.helpNum{width:25px;height:25px;border-radius:8px;background:#17191f;color:#d8b968;display:grid;place-items:center;font-size:9px;font-weight:900;flex:0 0 auto}
+.helpTool p{font-size:10.5px;line-height:1.48;margin:9px 0;color:#5e5b55}
+.helpTool p b{color:#202228}
+.helpFeeds{padding-top:8px;border-top:1px solid #eee9df;color:#81796b!important}
+.helpJump{border:0;background:transparent;padding:3px 0;color:#765721;font-size:10px;font-weight:900;cursor:pointer}
+.helpJump:hover{text-decoration:underline}
+.helpGlossary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.helpGloss{background:#fff;border:1px solid #e2dbcf;border-radius:11px;padding:10px 12px}
+.helpGloss summary{cursor:pointer;font-weight:850;font-size:11px}
+.helpGloss p{margin:8px 0 2px;color:#69645b;font-size:10px;line-height:1.5}
+.helpBoundary{background:#fff4dc;border:1px solid #ead7aa;border-radius:15px;padding:18px;margin-top:8px}
+.helpFooter{position:sticky;bottom:-34px;background:linear-gradient(180deg,rgba(248,245,238,0),#f8f5ee 28%);padding:28px 0 2px;display:flex;gap:8px;justify-content:flex-end}
+.floatingHelp{position:fixed;right:18px;bottom:18px;z-index:30;width:42px;height:42px;border-radius:50%;border:1px solid #c9a65d;background:#111318;color:#e4c77e;font-size:18px;font-weight:950;cursor:pointer;box-shadow:0 12px 30px rgba(0,0,0,.2)}
+.floatingHelp:hover{transform:translateY(-1px);background:#20242c}
 @media(max-width:820px){
   .shell{grid-template-columns:1fr}
   .side{left:-280px;width:260px}
   .side.open{left:0}
-
-  /*
-    Mobile header: first row stays compact; the current page title gets a
-    dedicated second row instead of being squeezed beside account actions.
-  */
-  header{
-    height:auto;
-    min-height:76px;
-    padding:9px 12px 10px;
-    display:grid;
-    grid-template-columns:auto minmax(0,1fr) auto;
-    grid-template-areas:
-      "menu brand account"
-      "title title title";
-    column-gap:9px;
-    row-gap:6px;
-    align-items:center;
-  }
+  header{height:auto;min-height:76px;padding:9px 12px 10px;display:grid;grid-template-columns:auto minmax(0,1fr) auto;grid-template-areas:"menu brand account" "title title title";column-gap:9px;row-gap:6px;align-items:center}
   .headleft{display:contents}
   .headleft>div{display:contents}
-  .menu{
-    grid-area:menu;
-    display:block;
-    width:32px;
-    min-width:32px;
-    padding:4px 2px;
-    line-height:1;
-  }
-  .eyebrow{
-    grid-area:brand;
-    min-width:0;
-    white-space:nowrap;
-    overflow:hidden;
-    text-overflow:ellipsis;
-    font-size:8px;
-    letter-spacing:.12em;
-  }
-  #title{
-    grid-area:title;
-    margin:0;
-    font-size:20px;
-    line-height:1.15;
-    white-space:normal;
-    overflow-wrap:anywhere;
-  }
-  .account{
-    grid-area:account;
-    justify-self:end;
-    gap:4px;
-    min-width:0;
-  }
+  .menu{grid-area:menu;display:block;width:32px;min-width:32px;padding:4px 2px;line-height:1}
+  .eyebrow{grid-area:brand;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:8px;letter-spacing:.12em}
+  #title{grid-area:title;margin:0;font-size:20px;line-height:1.15;white-space:normal;overflow-wrap:anywhere}
+  .account{grid-area:account;justify-self:end;gap:4px;min-width:0}
   .account .pill{font-size:8px;padding:5px 6px}
-  .account .outline,.account .primary{
-    padding:6px 7px;
-    border-radius:8px;
-    font-size:10px;
-    line-height:1.15;
-  }
-
+  .account .outline,.account .primary{padding:6px 7px;border-radius:8px;font-size:10px;line-height:1.15}
   .view{width:100%;max-width:100%;padding:15px 12px 24px}
   .dashboardIntro,.toolhead{min-width:0}
   .dashboardIntro h2,.toolhead h2{overflow-wrap:anywhere}
@@ -107,8 +99,12 @@ img,svg,video,canvas{max-width:100%;height:auto}
   table{min-width:560px}
   .modal{padding:12px}
   .modalbox{max-height:calc(100vh - 24px);overflow:auto;padding:20px 16px}
+  .helpPanel{width:100%;max-width:none;padding:21px 16px 28px}
+  .helpTop h2{font-size:29px}
+  .helpWorkspaceGrid,.helpTools,.helpGlossary{grid-template-columns:1fr}
+  .helpHero b{font-size:18px}
+  .floatingHelp{right:12px;bottom:12px}
 }
-
 @media(max-width:430px){
   header{padding-left:10px;padding-right:10px;column-gap:6px}
   .eyebrow{font-size:7px;letter-spacing:.1em}
@@ -119,4 +115,8 @@ img,svg,video,canvas{max-width:100%;height:auto}
   .view{padding-left:10px;padding-right:10px}
   .card,.result{padding:15px}
   .metric{padding:14px}
+  .helpTop{gap:12px}
+  .helpTop p{font-size:12px}
+  .helpFooter{justify-content:stretch}
+  .helpFooter button{flex:1}
 }
