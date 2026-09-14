@@ -1,0 +1,42 @@
+name: Repair invoice status signal push
+
+on:
+  push:
+    branches: [p0-production-hardening]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: p0-production-hardening
+      - name: Patch invoice status signal idempotently
+        shell: python
+        run: |
+          from pathlib import Path
+          p=Path('server.js')
+          text=p.read_text()
+          old="await upsertSubscriptionFromStripe(sub,event.data.object.status||event.type)"
+          new="await upsertSubscriptionFromStripe(sub,event.type==='invoice.payment_failed'?'payment_failed':'paid')"
+          if new in text:
+            raise SystemExit(0)
+          assert text.count(old)==1, 'invoice status anchor changed'
+          p.write_text(text.replace(old,new))
+      - name: Verify syntax
+        run: node --check server.js
+      - name: Commit patch if needed
+        run: |
+          if git diff --quiet -- server.js; then
+            echo "invoice status already patched"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add server.js
+          git commit -m "Persist explicit Stripe payment failure state"
+          git push origin HEAD:p0-production-hardening
