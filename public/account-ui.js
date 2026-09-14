@@ -43,7 +43,7 @@ async function showSignIn(){
 
 async function showCreateAccount(){
   const config=await publicConfig();
-  modal(`<div class="authscreen"><span class="kicker">MOTION SUPPLY BRAND OS</span><h2>Create your account</h2><p class="mini">Start with the free plan. You can upgrade later.</p><div class="authform"><label class="mini" for="acctEmail">Email</label><input id="acctEmail" type="email" autocomplete="email" inputmode="email" autocapitalize="none" spellcheck="false" placeholder="you@example.com"><label class="mini" for="acctPassword">Password</label><input id="acctPassword" type="password" autocomplete="new-password" placeholder="At least 8 characters"><label class="mini" for="acctPassword2">Confirm password</label><input id="acctPassword2" type="password" autocomplete="new-password" placeholder="Enter it again"><button id="acctSignup" class="primary">Create account</button><div id="acctMsg" class="mini" role="status" aria-live="polite"></div><div class="authswitch"><span class="mini">Already have an account?</span><button id="acctGoSignin" class="outline" type="button">Sign in</button></div>${legalLinks(config)}</div></div>`);
+  modal(`<div class="authscreen"><span class="kicker">MOTION SUPPLY BRAND OS</span><h2>Create your account</h2><p class="mini">Start with the free plan. You can upgrade later.</p><div class="authform"><label class="mini" for="acctEmail">Email</label><input id="acctEmail" type="email" autocomplete="email" inputmode="email" autocapitalize="none" spellcheck="false" placeholder="you@example.com"><label class="mini" for="acctPassword">Password</label><input id="acctPassword" type="password" autocomplete="new-password" placeholder="At least 8 characters"><label class="mini" for="acctPassword2">Confirm password</label><input id="acctPassword2" type="password" autocomplete="new-password" placeholder="Enter it again"><button id="acctSignup" class="primary">Create account</button><div id="acctMsg" class="mini" role="status" aria-live="polite"></div><div id="acctPostSignup" class="hidden"><div class="warning mt"><b>Already used this email before?</b> Supabase intentionally does not reveal whether an email already has an account. If no new confirmation arrives, sign in or reset the password instead of creating the same account again.</div><div class="split mt"><button id="acctAfterSignupSignin" class="outline" type="button">Sign in</button><button id="acctAfterSignupRecover" class="outline" type="button">Forgot password</button></div></div><div class="authswitch"><span class="mini">Already have an account?</span><button id="acctGoSignin" class="outline" type="button">Sign in</button></div>${legalLinks(config)}</div></div>`);
   $('#acctSignup').onclick=()=>authenticate('signup');
   $('#acctGoSignin').onclick=showSignIn;
 }
@@ -57,7 +57,13 @@ async function authenticate(kind){
   if(msg)msg.textContent=kind==='signin'?'Signing in…':'Creating account…';
   try{
     const data=await request(`/api/auth/${kind}`,'POST',{email,password});
-    if(data.confirmationRequired){if(msg)msg.textContent='Account created. Check your email to confirm, then sign in.';return}
+    if(data.confirmationRequired){
+      if(msg)msg.textContent='If this is a new account, check your email for the confirmation message. If you already used this email before, sign in or reset your password.';
+      const options=$('#acctPostSignup');if(options)options.classList.remove('hidden');
+      const signin=$('#acctAfterSignupSignin');if(signin)signin.onclick=showSignIn;
+      const recover=$('#acctAfterSignupRecover');if(recover)recover.onclick=showForgotPassword;
+      return
+    }
     storeSession(data.session);location.reload()
   }catch(e){if(msg)msg.textContent=e.message}
 }
