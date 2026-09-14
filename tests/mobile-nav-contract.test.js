@@ -17,3 +17,12 @@ test('mobile menu has independent dismissal and accessibility state wiring',()=>
   assert.match(app,/trigger\?\.focus\(\)/);
 });
 test('Business Memory uses the complete menu close path',()=>{assert.match(memory,/window\.msboCloseMenu\?\.\(\)/);});
+
+
+test('delete brand closes mobile navigation before confirmation',()=>{
+  const start=app.indexOf('async function deleteBrand(brandId)');
+  const end=app.indexOf('async function addSku',start);
+  const fn=app.slice(start,end);
+  assert.match(fn,/closeMenu\(\{restoreFocus:false\}\)/);
+  assert.ok(fn.indexOf('closeMenu')<fn.indexOf('confirm(warning)'));
+});

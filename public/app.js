@@ -300,6 +300,7 @@ async function addBrand(){
 }
 
 async function deleteBrand(brandId){
+  closeMenu({restoreFocus:false});
   const brand=brands.find(b=>String(b.id)===String(brandId));
   if(!brand)return;
   const skuCount=skus.filter(s=>String(s.brand_id)===String(brandId)).length;
