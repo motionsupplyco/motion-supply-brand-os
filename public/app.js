@@ -278,7 +278,7 @@ function renderImport(x,compact=false){
   const date=x.startDate||x.endDate?`<div class="mini importRange">Export range: ${escapeHtml(x.startDate||'—')} → ${escapeHtml(x.endDate||'—')}</div>`:'';
   return `${date}<div class="grid g4 mt">${metric('Orders in export',x.orderCount,'Unique order names')}${metric('Non-canceled order total',money(x.nonCanceledOrderTotal ?? x.csvOrderTotal),'Order Total field, excluding rows marked canceled')}${metric('Units in line items',x.units,'Line-item quantities')}${metric('Avg exported order total',money(x.averageOrderTotal),'CSV order total ÷ all exported orders')}</div>${compact?'':`<div class="grid g3 mt">${metric('Canceled orders',x.canceledOrders ?? 0)}${metric('Discount amount',money(x.csvDiscountAmount),'Exported order-level discount field')}${metric('Unique customer emails',x.uniqueCustomerEmails)}</div><div class="warning mt"><b>Not Shopify Analytics net sales.</b>This Orders CSV snapshot is an operational export. Returns and sales reversals can differ from Shopify Analytics. Use Transaction history for captured/refunded payment cash and Shopify Analytics for official net-sales reporting.</div><div class="table mt"><table><thead><tr><th>Top SKU / item</th><th>Units</th><th>Line-item value</th></tr></thead><tbody>${x.topSkus.map(s=>`<tr><td>${escapeHtml(s.sku)}</td><td>${s.units}</td><td>${money(s.value)}</td></tr>`).join('')}</tbody></table></div>`}`
 }
-function brandsView(){if(!session)return `${head('Brands & SKUs','Cloud saving needs an account. Calculators still work locally.','Secure cloud storage')}<div class="card"><p>Sign in to save brands and SKUs. Account traffic is proxied through the Brand OS server so the browser does not depend on a third-party CDN connection.</p><button class="primary" id="inlineSignIn">Sign in</button></div>`;const brandLimit=entitlement.limits?.brands,skuLimit=entitlement.limits?.skus,brandMaxed=!isPro()&&Number.isFinite(brandLimit)&&brands.length>=brandLimit,skuMaxed=!isPro()&&Number.isFinite(skuLimit)&&skus.length>=skuLimit;return `${head('Brands & SKUs','Save basic product economics under your account.','Owner-scoped cloud rows')}<div class="card"><div class="mini">${isPro()?'Pro: unlimited saved brands and SKUs.':`Free: ${brands.length}/${brandLimit??1} brand and ${skus.length}/${skuLimit??5} SKUs saved.`}</div>${brandMaxed?`<div class="advice mt"><b>Free brand limit reached.</b>Upgrade to Pro for unlimited brands and SKUs.</div>`:`<div class="split mt"><input id="brandName" placeholder="Brand name" style="flex:1;padding:11px;border:1px solid #ccc;border-radius:8px"><button id="addBrand" class="primary">Add brand</button></div>`}</div><div class="grid g2 mt">${brands.map(b=>`<div class="card"><div class="skuBar"><div><b>${escapeHtml(b.name)}</b><div class="mini">${escapeHtml(b.currency)}</div></div><button class="ghost" data-deletebrand="${b.id}" type="button">Delete brand</button></div><hr style="border:0;border-top:1px solid #eee"><div class="mini">${skus.filter(s=>s.brand_id===b.id).length} saved SKUs</div>${skuMaxed?`<div class="mini mt">Free SKU limit reached.</div>`:`<div class="split" style="margin-top:10px"><input id="sku-${b.id}" placeholder="SKU" style="width:90px;padding:8px"><input id="name-${b.id}" placeholder="Product" style="flex:1;padding:8px"><input id="price-${b.id}" type="number" min="0" step=".01" placeholder="Retail $" style="width:110px;padding:8px"><button data-addsku="${b.id}" class="outline">Add</button></div>`}${skus.filter(s=>s.brand_id===b.id).map(s=>`<div class="row"><span>${escapeHtml(s.sku)} · ${escapeHtml(s.name)}</span><b>${money(s.retail_price)}</b></div>`).join('')}</div>`).join('')||'<div class="card">No brands yet.</div>'}</div>`}
+function brandsView(){if(!session)return `${head('Brands & SKUs','Cloud saving needs an account. Calculators still work locally.','Secure cloud storage')}<div class="card"><p>Sign in to save brands and SKUs. Account traffic is proxied through the Brand OS server so the browser does not depend on a third-party CDN connection.</p><button class="primary" id="inlineSignIn">Sign in</button></div>`;const brandLimit=entitlement.limits?.brands,skuLimit=entitlement.limits?.skus,brandMaxed=!isPro()&&Number.isFinite(brandLimit)&&brands.length>=brandLimit,skuMaxed=!isPro()&&Number.isFinite(skuLimit)&&skus.length>=skuLimit;return `${head('Brands & SKUs','Save basic product economics under your account.','Owner-scoped cloud rows')}<div class="card"><div class="mini">${isPro()?'Pro: unlimited saved brands and SKUs.':`Free: ${brands.length}/${brandLimit??1} brand and ${skus.length}/${skuLimit??5} SKUs saved.`}</div>${brandMaxed?`<div class="advice mt"><b>Free brand limit reached.</b>Upgrade to Pro for unlimited brands and SKUs.</div>`:`<div class="split mt"><input id="brandName" placeholder="Brand name" style="flex:1;padding:11px;border:1px solid #ccc;border-radius:8px"><button id="addBrand" class="primary">Add brand</button></div>`}</div><div class="grid g2 mt">${brands.map(b=>`<div class="card"><div class="skuBar"><div><b>${escapeHtml(b.name)}</b><div class="mini">${escapeHtml(b.currency)}</div></div><div class="split"><button class="ghost" data-editbrand="${b.id}" type="button">Rename</button><button class="ghost" data-deletebrand="${b.id}" type="button">Delete brand</button></div></div><hr style="border:0;border-top:1px solid #eee"><div class="mini">${skus.filter(s=>s.brand_id===b.id).length} saved SKUs</div>${skuMaxed?`<div class="mini mt">Free SKU limit reached.</div>`:`<div class="split" style="margin-top:10px"><input id="sku-${b.id}" placeholder="SKU" style="width:90px;padding:8px"><input id="name-${b.id}" placeholder="Product" style="flex:1;padding:8px"><input id="price-${b.id}" type="number" min="0" step=".01" placeholder="Retail $" style="width:110px;padding:8px"><button data-addsku="${b.id}" class="outline">Add</button></div>`}${skus.filter(s=>s.brand_id===b.id).map(s=>`<div class="row"><span>${escapeHtml(s.sku)} · ${escapeHtml(s.name)}</span><div class="split"><b>${money(s.retail_price)}</b><button class="ghost" data-editsku="${s.id}" type="button">Edit</button><button class="ghost" data-deletesku="${s.id}" type="button">Delete</button></div></div>`).join('')}</div>`).join('')||'<div class="card">No brands yet.</div>'}</div>`}
 
 
 async function addBrand(){
@@ -297,6 +297,17 @@ async function addBrand(){
     if(btn){btn.disabled=false;btn.textContent='Add brand'}
     alert(e.message)
   }
+}
+
+async function editBrand(brandId){
+  const brand=brands.find(b=>String(b.id)===String(brandId));
+  if(!brand)return;
+  const value=prompt('Rename brand',brand.name);
+  if(value===null)return;
+  const name=value.trim();
+  if(!name){alert('Brand name is required.');return}
+  if(brands.some(b=>String(b.id)!==String(brandId)&&String(b.name||'').trim().toLowerCase()===name.toLowerCase())){alert('That brand already exists in your account.');return}
+  try{await api(`/api/brands/${encodeURIComponent(brandId)}`,'PATCH',{name},true);await loadCloud();render()}catch(e){alert(e.message)}
 }
 
 async function deleteBrand(brandId){
@@ -346,6 +357,25 @@ async function addSku(brandId){
   }
 }
 
+async function editSku(skuId){
+  const item=skus.find(s=>String(s.id)===String(skuId));
+  if(!item)return;
+  const sku=prompt('SKU code',item.sku);if(sku===null)return;
+  const name=prompt('Product name',item.name);if(name===null)return;
+  const priceRaw=prompt('Retail price',String(item.retail_price));if(priceRaw===null)return;
+  const retail_price=Number(priceRaw);
+  if(!sku.trim()||!name.trim()){alert('SKU and product name are required.');return}
+  if(!Number.isFinite(retail_price)||retail_price<0){alert('Enter a valid retail price.');return}
+  if(skus.some(s=>String(s.id)!==String(skuId)&&String(s.brand_id)===String(item.brand_id)&&String(s.sku||'').trim().toLowerCase()===sku.trim().toLowerCase())){alert('That SKU already exists under this brand.');return}
+  try{await api(`/api/skus/${encodeURIComponent(skuId)}`,'PATCH',{sku:sku.trim(),name:name.trim(),retail_price},true);await loadCloud();render()}catch(e){alert(e.message)}
+}
+
+async function deleteSku(skuId){
+  const item=skus.find(s=>String(s.id)===String(skuId));
+  if(!item||!confirm(`Delete ${item.sku} · ${item.name}? This cannot be undone.`))return;
+  try{await api(`/api/skus/${encodeURIComponent(skuId)}`,'DELETE',null,true);await refreshAccount();render()}catch(e){alert(e.message)}
+}
+
 
 function nextMoves(){
   const out=[];
@@ -382,9 +412,12 @@ function bind(){
   const f=$('#csvFile');if(f)f.onchange=handleCsv;
   const c=$('#clearImport');if(c)c.onclick=()=>{lastImport=null;save();render()};
   const s=$('#inlineSignIn');if(s)s.onclick=showAuth;
+  document.querySelectorAll('[data-editbrand]').forEach(el=>el.onclick=()=>editBrand(el.dataset.editbrand));
   document.querySelectorAll('[data-deletebrand]').forEach(el=>el.onclick=()=>deleteBrand(el.dataset.deletebrand));
   const ab=$('#addBrand');if(ab)ab.onclick=addBrand;const up=$('#upgradeNow');if(up)up.onclick=upgradeFlow;
-  document.querySelectorAll('[data-addsku]').forEach(b=>b.onclick=()=>addSku(b.dataset.addsku))
+  document.querySelectorAll('[data-addsku]').forEach(b=>b.onclick=()=>addSku(b.dataset.addsku));
+  document.querySelectorAll('[data-editsku]').forEach(b=>b.onclick=()=>editSku(b.dataset.editsku));
+  document.querySelectorAll('[data-deletesku]').forEach(b=>b.onclick=()=>deleteSku(b.dataset.deletesku))
 }
 function closeMenu({restoreFocus=true}={}){const side=$('#side'),trigger=$('#menuBtn'),wasOpen=Boolean(side?.classList.contains('open')||document.body.classList.contains('menuOpen'));side?.classList.remove('open');document.body.classList.remove('menuOpen');trigger?.setAttribute('aria-expanded','false');if(wasOpen&&restoreFocus)requestAnimationFrame(()=>trigger?.focus())}
 function openMenu(){const side=$('#side'),trigger=$('#menuBtn');side?.classList.add('open');document.body.classList.add('menuOpen');trigger?.setAttribute('aria-expanded','true');requestAnimationFrame(()=>($('#menuCloseBtn')||document.querySelector('#nav button'))?.focus())}
