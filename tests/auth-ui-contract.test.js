@@ -1,0 +1,23 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
+
+const server=await readFile(new URL('../server.js',import.meta.url),'utf8');
+const accountUi=await readFile(new URL('../public/account-ui.js',import.meta.url),'utf8');
+
+test('all signed-out account entrypoints use the production account surface',()=>{
+  assert.match(accountUi,/closest\('#authBtn'\).*showAccount\(\)/s);
+  assert.match(accountUi,/closest\('#inlineSignIn'\).*showSignIn\(\)/s);
+  assert.match(accountUi,/closest\('#upgradeNow'\).*loadSession\(\).*showSignIn\(\)/s);
+  assert.match(accountUi,/Forgot password\?/);
+  assert.match(accountUi,/\/privacy\.html/);
+  assert.match(accountUi,/\/terms\.html/);
+  assert.match(accountUi,/\/support\.html/);
+});
+
+test('protected API identity is revalidated against Supabase Auth on every request',()=>{
+  const helper=server.match(/async function userFromRequest\(req\)[\s\S]*?\nasync function subscriptionForUser/)?.[0]||'';
+  assert.ok(helper,'userFromRequest helper must exist');
+  assert.match(helper,/admin\.auth\.getUser\(token\)/);
+  assert.doesNotMatch(helper,/getSession\(/);
+});
