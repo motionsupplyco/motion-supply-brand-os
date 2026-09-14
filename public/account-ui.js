@@ -31,23 +31,42 @@ function legalLinks(config){
   links.push(`<a href="${escapeHtml(supportUrl)}" target="_blank" rel="noopener">Support</a>`);
   return `<p class="mini mt">${links.join(' · ')}</p>`
 }
+async function publicConfig(){try{return await fetch('/api/public-config').then(r=>r.json())}catch{return{}}}
 
 async function showSignIn(){
-  let config={};try{config=await fetch('/api/public-config').then(r=>r.json())}catch{}
-  modal(`<h2>Sign in / create account</h2><div class="authform"><input id="acctEmail" type="email" autocomplete="email" placeholder="Email"><input id="acctPassword" type="password" autocomplete="current-password" placeholder="Password (8+ characters)"><div id="acctMsg" class="mini"></div><div class="split"><button id="acctSignin" class="primary">Sign in</button><button id="acctSignup" class="outline">Create account</button></div><button id="acctForgot" class="ghost mt">Forgot password?</button>${legalLinks(config)}</div>`);
+  const config=await publicConfig();
+  modal(`<div class="authscreen"><span class="kicker">MOTION SUPPLY BRAND OS</span><h2>Welcome back</h2><p class="mini">Sign in to continue to your brand workspace.</p><div class="authform"><label class="mini" for="acctEmail">Email</label><input id="acctEmail" type="email" autocomplete="email" inputmode="email" placeholder="you@example.com"><label class="mini" for="acctPassword">Password</label><input id="acctPassword" type="password" autocomplete="current-password" placeholder="Your password"><button id="acctSignin" class="primary">Sign in</button><button id="acctForgot" class="authlink" type="button">Forgot password?</button><div id="acctMsg" class="mini" role="status" aria-live="polite"></div><div class="authswitch"><span class="mini">Don’t have an account?</span><button id="acctGoSignup" class="outline" type="button">Create account</button></div>${legalLinks(config)}</div></div>`);
   $('#acctSignin').onclick=()=>authenticate('signin');
+  $('#acctForgot').onclick=showForgotPassword;
+  $('#acctGoSignup').onclick=showCreateAccount;
+}
+
+async function showCreateAccount(){
+  const config=await publicConfig();
+  modal(`<div class="authscreen"><span class="kicker">MOTION SUPPLY BRAND OS</span><h2>Create your account</h2><p class="mini">Start with the free plan. You can upgrade later.</p><div class="authform"><label class="mini" for="acctEmail">Email</label><input id="acctEmail" type="email" autocomplete="email" inputmode="email" placeholder="you@example.com"><label class="mini" for="acctPassword">Password</label><input id="acctPassword" type="password" autocomplete="new-password" placeholder="At least 8 characters"><label class="mini" for="acctPassword2">Confirm password</label><input id="acctPassword2" type="password" autocomplete="new-password" placeholder="Enter it again"><button id="acctSignup" class="primary">Create account</button><div id="acctMsg" class="mini" role="status" aria-live="polite"></div><div class="authswitch"><span class="mini">Already have an account?</span><button id="acctGoSignin" class="outline" type="button">Sign in</button></div>${legalLinks(config)}</div></div>`);
   $('#acctSignup').onclick=()=>authenticate('signup');
-  $('#acctForgot').onclick=forgotPassword;
+  $('#acctGoSignin').onclick=showSignIn;
 }
 
 async function authenticate(kind){
   const email=$('#acctEmail')?.value.trim()||'',password=$('#acctPassword')?.value||'',msg=$('#acctMsg');
-  if(msg)msg.textContent='Working…';
+  if(kind==='signup'){
+    const confirm=$('#acctPassword2')?.value||'';
+    if(password!==confirm){if(msg)msg.textContent='Passwords do not match.';return}
+  }
+  if(msg)msg.textContent=kind==='signin'?'Signing in…':'Creating account…';
   try{
     const data=await request(`/api/auth/${kind}`,'POST',{email,password});
     if(data.confirmationRequired){if(msg)msg.textContent='Account created. Check your email to confirm, then sign in.';return}
     storeSession(data.session);location.reload()
   }catch(e){if(msg)msg.textContent=e.message}
+}
+
+async function showForgotPassword(){
+  const config=await publicConfig();
+  modal(`<div class="authscreen"><span class="kicker">ACCOUNT RECOVERY</span><h2>Reset your password</h2><p class="mini">Enter the email tied to your Brand OS account. We’ll send a secure recovery link if the account exists.</p><div class="authform"><label class="mini" for="acctEmail">Email</label><input id="acctEmail" type="email" autocomplete="email" inputmode="email" placeholder="you@example.com"><button id="acctRecover" class="primary">Send recovery link</button><div id="acctMsg" class="mini" role="status" aria-live="polite"></div><button id="acctBackSignin" class="outline" type="button">Back to sign in</button>${legalLinks(config)}</div></div>`);
+  $('#acctRecover').onclick=forgotPassword;
+  $('#acctBackSignin').onclick=showSignIn;
 }
 
 async function forgotPassword(){
@@ -58,7 +77,7 @@ async function forgotPassword(){
 }
 
 function showResetPassword(){
-  modal(`<h2>Choose a new password</h2><p class="mini">Enter a new password for your Brand OS account.</p><div class="authform"><input id="acctNewPassword" type="password" autocomplete="new-password" placeholder="New password (8+ characters)"><input id="acctNewPassword2" type="password" autocomplete="new-password" placeholder="Confirm new password"><button id="acctSetPassword" class="primary">Update password</button><div id="acctResetMsg" class="mini"></div></div>`);
+  modal(`<div class="authscreen"><span class="kicker">ACCOUNT RECOVERY</span><h2>Choose a new password</h2><p class="mini">Enter a new password for your Brand OS account.</p><div class="authform"><label class="mini" for="acctNewPassword">New password</label><input id="acctNewPassword" type="password" autocomplete="new-password" placeholder="At least 8 characters"><label class="mini" for="acctNewPassword2">Confirm new password</label><input id="acctNewPassword2" type="password" autocomplete="new-password" placeholder="Enter it again"><button id="acctSetPassword" class="primary">Update password</button><div id="acctResetMsg" class="mini" role="status" aria-live="polite"></div></div></div>`);
   $('#acctSetPassword').onclick=completePasswordReset;
 }
 
