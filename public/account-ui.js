@@ -25,9 +25,10 @@ function legalLinks(config){
   const links=[];
   const privacyUrl=config?.privacyUrl||'/privacy.html';
   const termsUrl=config?.termsUrl||'/terms.html';
+  const supportUrl=config?.supportUrl||'/support.html';
   links.push(`<a href="${escapeHtml(privacyUrl)}" target="_blank" rel="noopener">Privacy</a>`);
   links.push(`<a href="${escapeHtml(termsUrl)}" target="_blank" rel="noopener">Terms</a>`);
-  if(config?.supportUrl)links.push(`<a href="${escapeHtml(config.supportUrl)}" target="_blank" rel="noopener">Support</a>`);
+  links.push(`<a href="${escapeHtml(supportUrl)}" target="_blank" rel="noopener">Support</a>`);
   return `<p class="mini mt">${links.join(' · ')}</p>`
 }
 
