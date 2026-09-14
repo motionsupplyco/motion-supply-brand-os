@@ -16,9 +16,12 @@ const requiredRoutes=[
   "app.delete('/api/account'",
   "app.get('/api/brands'",
   "app.post('/api/brands'",
+  "app.patch('/api/brands/:id'",
   "app.delete('/api/brands/:id'",
   "app.get('/api/skus'",
   "app.post('/api/skus'",
+  "app.patch('/api/skus/:id'",
+  "app.delete('/api/skus/:id'",
   "app.post('/api/import-summaries'",
   "app.get('/api/entitlement'",
   "app.post('/api/events'",
@@ -121,4 +124,15 @@ test('brand deletion is authenticated owner-scoped',()=>{
   assert.match(route,/userFromRequest\(req\)/);
   assert.match(route,/\.eq\('id',id\)\.eq\('owner_id',user\.id\)/);
   assert.match(route,/from\('brands'\)\.delete\(\)\.eq\('id',id\)\.eq\('owner_id',user\.id\)/);
+});
+
+test('brand and SKU update/delete routes remain owner-scoped',()=>{
+  for(const marker of ["app.patch('/api/brands/:id'","app.patch('/api/skus/:id'","app.delete('/api/skus/:id'"]){
+    const start=server.indexOf(marker);
+    const next=server.indexOf('\napp.',start+5);
+    const route=start>=0?server.slice(start,next>start?next:undefined):'';
+    assert.ok(route,`missing CRUD route: ${marker}`);
+    assert.match(route,/userFromRequest\(req\)/);
+    assert.match(route,/\.eq\('id',id\)\.eq\('owner_id',user\.id\)/);
+  }
 });
