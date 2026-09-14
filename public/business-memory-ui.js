@@ -25,7 +25,7 @@ async function request(url,method='GET',body){
   return data
 }
 
-async function renderBusinessMemory(){
+async function renderBusinessMemory(initialScope=''){
   const app=$('#app'),title=$('#title');if(!app)return;
   if(title)title.textContent='Business Memory';
   document.querySelectorAll('#nav button').forEach(x=>x.classList.toggle('active',x.id==='memoryNav'));
@@ -37,14 +37,16 @@ async function renderBusinessMemory(){
   app.innerHTML='<div class="card"><p>Loading Business Memory…</p></div>';
   try{
     const [memoryResult,brandResult]=await Promise.all([request('/api/business-memory'),request('/api/brands')]);
-    drawMemory(memoryResult.memory||[],brandResult.brands||[],'');
+    const brands=brandResult.brands||[];
+    const validScope=initialScope&&brands.some(b=>String(b.id)===String(initialScope))?String(initialScope):'';
+    drawMemory(memoryResult.memory||[],brands,validScope);
   }catch(e){
     if(e.status===402){
       app.innerHTML='<div class="toolhead"><div><span class="kicker">PRO OPERATING LAYER</span><h2>Business Memory</h2><p class="muted">Persistent context for better operating decisions.</p></div><span class="source">PRO</span></div><div class="card"><h3>Business Memory is a Pro feature</h3><p>Free keeps the core calculators. Pro adds saved operating context so Brand OS can remember the business between sessions.</p><button id="memoryUpgrade" class="primary">Upgrade to Pro</button></div>';
       $('#memoryUpgrade').onclick=()=>$('#billingBtn')?.click();return;
     }
     app.innerHTML=`<div class="card"><h3>Business Memory could not load</h3><p>${esc(e.message)}</p><button id="memoryRetry" class="outline">Try again</button></div>`;
-    $('#memoryRetry').onclick=renderBusinessMemory;
+    $('#memoryRetry').onclick=()=>renderBusinessMemory(initialScope);
   }
 }
 
@@ -58,19 +60,19 @@ function drawMemory(allMemory,brands,scope){
   <div class="grid g2 mt">${MEMORY_SECTIONS.map(([key,label,help])=>{const row=byKey.get(key),text=row?.value?.text||'';return `<div class="card"><span class="kicker">MEMORY</span><h3>${esc(label)}</h3><p class="mini">${esc(help)}</p><textarea id="memory-${key}" rows="7" style="width:100%;box-sizing:border-box;padding:11px;border:1px solid #ccc;border-radius:8px;resize:vertical">${esc(text)}</textarea><div class="split mt"><button class="primary" data-memory-save="${key}">Save</button>${row?`<button class="outline" data-memory-clear="${esc(row.id)}">Clear</button>`:''}</div><div class="mini mt" id="memory-msg-${key}"></div></div>`}).join('')}</div>
   <div class="advice mt"><b>What this is for</b>Business Memory should hold durable context—not temporary dashboard numbers. Calculators should still use current inputs and imported data for math.</div>`;
   $('#memoryScope').onchange=e=>drawMemory(allMemory,brands,e.target.value);
-  document.querySelectorAll('[data-memory-save]').forEach(btn=>btn.onclick=()=>saveMemory(btn.dataset.memorySave,scope,allMemory,brands));
+  document.querySelectorAll('[data-memory-save]').forEach(btn=>btn.onclick=()=>saveMemory(btn.dataset.memorySave,scope));
   document.querySelectorAll('[data-memory-clear]').forEach(btn=>btn.onclick=()=>clearMemory(btn.dataset.memoryClear,scope));
 }
 
-async function saveMemory(key,scope,allMemory,brands){
+async function saveMemory(key,scope){
   const text=$(`#memory-${key}`)?.value.trim()||'',msg=$(`#memory-msg-${key}`);
   if(!text){if(msg)msg.textContent='Add something useful before saving.';return}
   if(msg)msg.textContent='Saving…';
-  try{await request(`/api/business-memory/${encodeURIComponent(key)}`,'PUT',{brand_id:scope||null,value:{text}});if(msg)msg.textContent='Saved ✓';setTimeout(()=>renderBusinessMemory(),500)}catch(e){if(msg)msg.textContent=e.message}
+  try{await request(`/api/business-memory/${encodeURIComponent(key)}`,'PUT',{brand_id:scope||null,value:{text}});if(msg)msg.textContent='Saved ✓';setTimeout(()=>renderBusinessMemory(scope),500)}catch(e){if(msg)msg.textContent=e.message}
 }
 
 async function clearMemory(id,scope){
-  try{await request(`/api/business-memory/${encodeURIComponent(id)}`,'DELETE');await renderBusinessMemory();if(scope)setTimeout(()=>{const sel=$('#memoryScope');if(sel){sel.value=scope;sel.dispatchEvent(new Event('change'))}},0)}catch(e){alert(e.message)}
+  try{await request(`/api/business-memory/${encodeURIComponent(id)}`,'DELETE');await renderBusinessMemory(scope)}catch(e){alert(e.message)}
 }
 
 document.addEventListener('click',e=>{
