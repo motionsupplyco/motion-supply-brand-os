@@ -82,6 +82,21 @@ test('P0 billing lifecycle persists cancellation, trial, invoice, and atomic web
   assert.match(server,/cancel_at_period_end/);
 });
 
+test('billing recovery prevents duplicate Stripe subscriptions and routes users to portal',()=>{
+  assert.match(server,/const hasOpenStripeSub=sub=>Boolean\(sub\?\.stripe_subscription_id&&!\['canceled','incomplete_expired'\]\.includes\(sub\.status\)\)/);
+  assert.match(server,/billingManageable:hasOpenStripeSub\(access\.sub\)/);
+  const checkoutStart=server.indexOf("app.post('/api/create-checkout-session'");
+  const checkoutEnd=server.indexOf("app.post('/api/create-portal-session'",checkoutStart);
+  const checkoutRoute=checkoutStart>=0&&checkoutEnd>checkoutStart?server.slice(checkoutStart,checkoutEnd):'';
+  assert.ok(checkoutRoute,'checkout route must exist');
+  assert.match(checkoutRoute,/if\(isActiveSub\(existing\)\).*ALREADY_PRO/);
+  assert.match(checkoutRoute,/if\(hasOpenStripeSub\(existing\)\).*BILLING_RECOVERY_REQUIRED/);
+  assert.ok(checkoutRoute.indexOf('BILLING_RECOVERY_REQUIRED')<checkoutRoute.indexOf('stripe.checkout.sessions.create'),'existing subscription must be blocked before creating a checkout session');
+  assert.match(accountUi,/const manageBilling=Boolean\(account\.active\|\|account\.billingManageable\)/);
+  assert.match(accountUi,/manageBilling\?'Manage billing':'Upgrade to Pro'/);
+  assert.match(accountUi,/openBilling\(manageBilling\)/);
+});
+
 test('Stripe subscription sync ignores events for deleted Brand OS users',()=>{
   const sync=server.match(/async function upsertSubscriptionFromStripe[\s\S]*?\n\napp\.post\('\/api\/stripe-webhook'/)?.[0]||'';
   assert.match(sync,/admin\.auth\.admin\.getUserById\(userId\)/);
