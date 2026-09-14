@@ -13,6 +13,7 @@ const accountUi=await readFile(new URL('../public/account-ui.js',import.meta.url
 const indexHtml=await readFile(new URL('../public/index.html',import.meta.url),'utf8');
 const privacyHtml=await readFile(new URL('../public/privacy.html',import.meta.url),'utf8');
 const termsHtml=await readFile(new URL('../public/terms.html',import.meta.url),'utf8');
+const supportHtml=await readFile(new URL('../public/support.html',import.meta.url),'utf8');
 
 test('paid cloud features have server-side entitlement enforcement',()=>{
   assert.match(server,/requireProUser\(req,res\)/);
@@ -109,13 +110,17 @@ test('security contract includes request IDs, CSP, no-store API responses, and r
   assert.match(server,/express\.json\(\{limit:'256kb'\}\)/);
 });
 
-test('legal policies are user-accessible even without external URL configuration',()=>{
+test('legal and support pages are user-accessible without external URL configuration',()=>{
   assert.match(accountUi,/config\?\.privacyUrl\|\|'\/privacy\.html'/);
   assert.match(accountUi,/config\?\.termsUrl\|\|'\/terms\.html'/);
+  assert.match(accountUi,/config\?\.supportUrl\|\|'\/support\.html'/);
   assert.match(privacyHtml,/<h1>Privacy Policy<\/h1>/);
   assert.match(privacyHtml,/account deletion/i);
   assert.match(termsHtml,/<h1>Terms of Service<\/h1>/);
   assert.match(termsHtml,/Paid plans/);
+  assert.match(supportHtml,/<h1>Support<\/h1>/);
+  assert.match(supportHtml,/Account & sign-in/);
+  assert.match(supportHtml,/Privacy & deletion/);
 });
 
 test('public config exposes legal and support destinations without secret values',()=>{
