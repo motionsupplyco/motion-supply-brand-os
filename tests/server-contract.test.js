@@ -74,6 +74,14 @@ test('P0 billing lifecycle persists cancellation, trial, invoice, and atomic web
   assert.match(server,/cancel_at_period_end/);
 });
 
+test('Stripe subscription sync ignores events for deleted Brand OS users',()=>{
+  const sync=server.match(/async function upsertSubscriptionFromStripe[\s\S]*?\n\napp\.post\('\/api\/stripe-webhook'/)?.[0]||'';
+  assert.match(sync,/admin\.auth\.admin\.getUserById\(userId\)/);
+  assert.match(sync,/if\(userError\|\|!userData\?\.user\)return/);
+  assert.match(sync,/from\('subscriptions'\)\.upsert/);
+  assert.ok(sync.indexOf('getUserById(userId)')<sync.indexOf("from('subscriptions').upsert"),'auth-user existence must be checked before subscription upsert');
+});
+
 test('account lifecycle includes complete password recovery and authenticated deletion',()=>{
   assert.match(server,/app\.post\('\/api\/auth\/recover'/);
   assert.match(server,/resetPasswordForEmail/);
