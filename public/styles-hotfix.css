@@ -5,6 +5,9 @@
   overflow-y:auto;
   overflow-x:hidden;
 }
+.sideTop{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.menuClose{display:none;border:1px solid #353943;background:#17191f;color:#fff;width:36px;height:36px;border-radius:10px;font-size:24px;line-height:1;cursor:pointer;flex:0 0 auto}
+.menuBackdrop{display:none}
 .side nav{
   display:flex;
   flex-direction:column;
@@ -94,8 +97,13 @@ body.helpOpen{overflow:hidden}
 
 @media(max-width:820px){
   .shell{grid-template-columns:1fr}
-  .side{left:-280px;width:260px}
+  .side{left:-280px;width:260px;z-index:72;transition:left .2s ease}
   .side.open{left:0}
+  .sideTop{position:sticky;top:0;z-index:2;background:#111318;padding-bottom:8px}
+  .menuClose{display:grid;place-items:center}
+  .menuBackdrop{display:block;position:fixed;inset:0;z-index:71;border:0;padding:0;background:rgba(7,9,12,.58);opacity:0;pointer-events:none;transition:opacity .2s ease}
+  body.menuOpen{overflow:hidden}
+  body.menuOpen .menuBackdrop{opacity:1;pointer-events:auto}
   header{height:auto;min-height:76px;padding:9px 12px 10px;display:grid;grid-template-columns:auto minmax(0,1fr) auto;grid-template-areas:"menu brand account" "title title title";column-gap:9px;row-gap:6px;align-items:center}
   .headleft{display:contents}
   .headleft>div{display:contents}
