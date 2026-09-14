@@ -17,22 +17,32 @@
     </div>
     <div class="navlabel">OPERATE</div>
     <nav id="nav">
+      <div class="navgroup">Command Center</div>
       <button class="active" data-view="dashboard"><span>▦</span>Business Health</button>
+      <button data-view="advisor"><span>→</span>Next Move</button>
+
+      <div class="navgroup">Make Money</div>
       <button data-view="profit"><span>↗</span>Profit & Pricing</button>
       <button data-view="cac"><span>◎</span>Customer Acquisition</button>
-      <button data-view="funnel"><span>⇢</span>Store Funnel</button>
-      <button data-view="discount"><span>%</span>Discounts</button>
-      <button data-view="inventory"><span>□</span>Inventory</button>
-      <button data-view="wholesale"><span>◇</span>Wholesale</button>
+      <button data-view="discount"><span>%</span>Discount Ceiling</button>
       <button data-view="launch"><span>△</span>Launch & Break-Even</button>
-      <button data-view="fulfillment"><span>↔</span>3PL Decision</button>
-      <button data-view="cash"><span>$</span>Cash</button>
-      <button data-view="po"><span>PO</span>PO Cash Gate</button>
+
+      <div class="navgroup">Read the Store</div>
+      <button data-view="funnel"><span>⇢</span>Store Funnel</button>
       <button data-view="shopify"><span>S</span>Shopify Import</button>
+
+      <div class="navgroup">Protect Cash</div>
+      <button data-view="inventory"><span>□</span>Inventory & Reorder</button>
+      <button data-view="cash"><span>$</span>Cash Checkpoint</button>
+      <button data-view="po"><span>PO</span>PO Cash Gate</button>
+      <button data-view="fulfillment"><span>↔</span>3PL Decision</button>
+
+      <div class="navgroup">Expand & Organize</div>
+      <button data-view="wholesale"><span>◇</span>Wholesale Economics</button>
       <button data-view="brands"><span>▤</span>Brands & SKUs</button>
-      <button data-view="advisor"><span>→</span>Next Move</button>
     </nav>
     <div class="sidebottom">
+      <button id="learnBtn" class="ghost">Start Here · Beginner Guide</button>
       <div class="sidehint">Need sample numbers?</div>
       <button id="demoBtn" class="ghost">Load Foundry Eight demo</button>
       <button id="freshBtn" class="ghost subtle">Start fresh</button>
@@ -58,5 +68,6 @@
 </div>
 <div id="modal" class="modal hidden"><div class="modalbox"><button id="closeModal" class="close">×</button><div id="modalBody"></div></div></div>
 <script type="module" src="app.js"></script>
+<script type="module" src="help.js"></script>
 </body>
 </html>
