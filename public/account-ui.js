@@ -20,6 +20,22 @@ async function request(url,method='GET',body,auth=false){
   return data
 }
 
+async function withPending(button,pendingLabel,task){
+  if(!button||button.disabled)return;
+  const previousLabel=button.textContent;
+  button.disabled=true;
+  button.setAttribute('aria-busy','true');
+  if(pendingLabel)button.textContent=pendingLabel;
+  try{return await task()}
+  finally{
+    if(button.isConnected){
+      button.disabled=false;
+      button.removeAttribute('aria-busy');
+      button.textContent=previousLabel;
+    }
+  }
+}
+
 function formatDate(value){if(!value)return null;const d=new Date(value);return Number.isNaN(d.getTime())?null:d.toLocaleDateString(undefined,{year:'numeric',month:'short',day:'numeric'})}
 function legalLinks(config){
   const links=[];
@@ -54,18 +70,21 @@ async function authenticate(kind){
     const confirm=$('#acctPassword2')?.value||'';
     if(password!==confirm){if(msg)msg.textContent='Passwords do not match.';return}
   }
-  if(msg)msg.textContent=kind==='signin'?'Signing in…':'Creating account…';
-  try{
-    const data=await request(`/api/auth/${kind}`,'POST',{email,password});
-    if(data.confirmationRequired){
-      if(msg)msg.textContent='If this is a new account, check your email for the confirmation message. If you already used this email before, sign in or reset your password.';
-      const options=$('#acctPostSignup');if(options)options.classList.remove('hidden');
-      const signin=$('#acctAfterSignupSignin');if(signin)signin.onclick=showSignIn;
-      const recover=$('#acctAfterSignupRecover');if(recover)recover.onclick=showForgotPassword;
-      return
-    }
-    storeSession(data.session);location.reload()
-  }catch(e){if(msg)msg.textContent=e.message}
+  const button=$(kind==='signin'?'#acctSignin':'#acctSignup');
+  await withPending(button,kind==='signin'?'Signing in…':'Creating account…',async()=>{
+    if(msg)msg.textContent=kind==='signin'?'Signing in…':'Creating account…';
+    try{
+      const data=await request(`/api/auth/${kind}`,'POST',{email,password});
+      if(data.confirmationRequired){
+        if(msg)msg.textContent='If this is a new account, check your email for the confirmation message. If you already used this email before, sign in or reset your password.';
+        const options=$('#acctPostSignup');if(options)options.classList.remove('hidden');
+        const signin=$('#acctAfterSignupSignin');if(signin)signin.onclick=showSignIn;
+        const recover=$('#acctAfterSignupRecover');if(recover)recover.onclick=showForgotPassword;
+        return
+      }
+      storeSession(data.session);location.reload()
+    }catch(e){if(msg)msg.textContent=e.message}
+  })
 }
 
 async function showForgotPassword(){
@@ -78,8 +97,11 @@ async function showForgotPassword(){
 async function forgotPassword(){
   const email=$('#acctEmail')?.value.trim()||'';
   if(!email){const msg=$('#acctMsg');if(msg)msg.textContent='Enter your email first.';return}
-  const msg=$('#acctMsg');if(msg)msg.textContent='Sending recovery email…';
-  try{const data=await request('/api/auth/recover','POST',{email});if(msg)msg.textContent=data.message||'If that account exists, a recovery email has been sent.'}catch(e){if(msg)msg.textContent=e.message}
+  const msg=$('#acctMsg'),button=$('#acctRecover');
+  await withPending(button,'Sending…',async()=>{
+    if(msg)msg.textContent='Sending recovery email…';
+    try{const data=await request('/api/auth/recover','POST',{email});if(msg)msg.textContent=data.message||'If that account exists, a recovery email has been sent.'}catch(e){if(msg)msg.textContent=e.message}
+  })
 }
 
 function showResetPassword(){
@@ -91,13 +113,16 @@ async function completePasswordReset(){
   const password=$('#acctNewPassword')?.value||'',confirm=$('#acctNewPassword2')?.value||'',msg=$('#acctResetMsg');
   if(password.length<8){if(msg)msg.textContent='Use at least 8 characters.';return}
   if(password!==confirm){if(msg)msg.textContent='Passwords do not match.';return}
-  if(msg)msg.textContent='Updating password…';
-  try{
-    await request('/api/auth/update-password','POST',{password},true);
-    if(msg)msg.textContent='Password updated. You can continue using Brand OS.';
-    history.replaceState({},document.title,location.pathname);
-    setTimeout(()=>location.reload(),500);
-  }catch(e){if(msg)msg.textContent=e.message}
+  const button=$('#acctSetPassword');
+  await withPending(button,'Updating…',async()=>{
+    if(msg)msg.textContent='Updating password…';
+    try{
+      await request('/api/auth/update-password','POST',{password},true);
+      if(msg)msg.textContent='Password updated. You can continue using Brand OS.';
+      history.replaceState({},document.title,location.pathname);
+      setTimeout(()=>location.reload(),500);
+    }catch(e){if(msg)msg.textContent=e.message}
+  })
 }
 
 function captureRecoverySession(){
@@ -137,14 +162,20 @@ async function showAccount(){
 }
 
 async function openBilling(active){
-  try{const data=await request(active?'/api/create-portal-session':'/api/create-checkout-session','POST',{},true);location.href=data.url}catch(e){alert(e.message)}
+  const button=$('#acctBillingOpen');
+  await withPending(button,active?'Opening billing…':'Opening checkout…',async()=>{
+    try{const data=await request(active?'/api/create-portal-session':'/api/create-checkout-session','POST',{},true);location.href=data.url}catch(e){alert(e.message)}
+  })
 }
 
 async function deleteAccount(){
   const confirm=$('#acctDeleteConfirm')?.value||'',msg=$('#acctDeleteMsg');
   if(confirm!=='DELETE'){if(msg)msg.textContent='Type DELETE exactly to confirm.';return}
-  if(msg)msg.textContent='Deleting account…';
-  try{await request('/api/account','DELETE',{confirm:'DELETE'},true);storeSession(null);location.reload()}catch(e){if(msg)msg.textContent=e.message}
+  const button=$('#acctDelete');
+  await withPending(button,'Deleting…',async()=>{
+    if(msg)msg.textContent='Deleting account…';
+    try{await request('/api/account','DELETE',{confirm:'DELETE'},true);storeSession(null);location.reload()}catch(e){if(msg)msg.textContent=e.message}
+  })
 }
 
 // Capture these clicks before app.js so this production account surface owns the account UX.
