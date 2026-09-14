@@ -28,6 +28,7 @@ jobs:
       - name: Syntax check app modules
         run: |
           node --check public/app.js
+          node --check public/account-ui.js
           node --check public/math.js
           node --check public/shopify.js
           node --check public/help.js
