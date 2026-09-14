@@ -114,10 +114,9 @@ test('account lifecycle includes user-scoped password recovery and authenticated
   const updateEnd=server.indexOf("app.get('/api/account'",updateStart);
   const updateRoute=updateStart>=0&&updateEnd>updateStart?server.slice(updateStart,updateEnd):'';
   assert.ok(updateRoute,'password update route must exist');
-  assert.match(updateRoute,/Authorization:`Bearer \$\{token\}`/);
-  assert.match(updateRoute,/userClient\.auth\.getUser\(\)/);
-  assert.match(updateRoute,/userClient\.auth\.updateUser\(\{password\}\)/);
-  assert.doesNotMatch(updateRoute,/admin\.auth\.admin\.updateUserById/);
+  assert.match(updateRoute,/admin\.auth\.getUser\(token\)/);
+  assert.match(updateRoute,/admin\.auth\.admin\.updateUserById\(userData\.user\.id,\{password\}\)/);
+  assert.doesNotMatch(updateRoute,/userClient\.auth\.updateUser/);
   assert.match(server,/app\.delete\('\/api\/account'/);
   assert.match(server,/admin\.auth\.admin\.deleteUser/);
   assert.match(server,/status:'completed',completed_at:new Date\(\)\.toISOString\(\)/);

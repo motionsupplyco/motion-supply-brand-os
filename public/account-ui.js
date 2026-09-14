@@ -3,7 +3,7 @@ const escapeHtml=s=>String(s??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;'
 
 function loadSession(){try{return JSON.parse(localStorage.getItem('msbo_session')||'null')}catch{return null}}
 function storeSession(s){if(s)localStorage.setItem('msbo_session',JSON.stringify(s));else localStorage.removeItem('msbo_session')}
-function modal(html){const body=$('#modalBody'),root=$('#modal');if(!body||!root)return;body.innerHTML=html;root.classList.remove('hidden')}
+function modal(html){window.msboCloseMenu?.({restoreFocus:false});const body=$('#modalBody'),root=$('#modal');if(!body||!root)return;body.innerHTML=html;root.classList.remove('hidden')}
 function closeModal(){$('#modal')?.classList.add('hidden')}
 
 async function request(url,method='GET',body,auth=false){

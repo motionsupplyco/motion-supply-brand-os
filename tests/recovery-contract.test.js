@@ -25,3 +25,12 @@ test('password recovery does not report success when Supabase rejects delivery',
   assert.match(route,/console\.error\('recover-email'/);
   assert.ok(route.indexOf('if(error)')>route.indexOf('resetPasswordForEmail'),'delivery error must be checked after Supabase returns');
 });
+
+test('password update validates the bearer token before changing only that user',()=>{
+  const start=server.indexOf("app.post('/api/auth/update-password'");
+  const end=server.indexOf("app.get('/api/account'",start);
+  const route=server.slice(start,end);
+  assert.match(route,/admin\.auth\.getUser\(token\)/);
+  assert.match(route,/admin\.auth\.admin\.updateUserById\(userData\.user\.id,\{password\}\)/);
+  assert.doesNotMatch(route,/userClient\.auth\.updateUser/);
+});

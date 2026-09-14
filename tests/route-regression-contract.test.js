@@ -16,6 +16,7 @@ const requiredRoutes=[
   "app.delete('/api/account'",
   "app.get('/api/brands'",
   "app.post('/api/brands'",
+  "app.delete('/api/brands/:id'",
   "app.get('/api/skus'",
   "app.post('/api/skus'",
   "app.post('/api/import-summaries'",
@@ -110,4 +111,14 @@ test('API fallback and generic error handling stay in front of the static SPA fa
   assert.ok(spaFallback>staticServe,'SPA fallback must execute after static hosting');
   assert.match(server,/API_NOT_FOUND/);
   assert.match(server,/INTERNAL_ERROR/);
+});
+
+test('brand deletion is authenticated owner-scoped',()=>{
+  const start=server.indexOf("app.delete('/api/brands/:id'");
+  const end=server.indexOf("app.get('/api/skus'",start);
+  const route=server.slice(start,end);
+  assert.ok(route,'brand delete route must exist');
+  assert.match(route,/userFromRequest\(req\)/);
+  assert.match(route,/\.eq\('id',id\)\.eq\('owner_id',user\.id\)/);
+  assert.match(route,/from\('brands'\)\.delete\(\)\.eq\('id',id\)\.eq\('owner_id',user\.id\)/);
 });

@@ -29,7 +29,7 @@ async function renderBusinessMemory(initialScope=''){
   const app=$('#app'),title=$('#title');if(!app)return;
   if(title)title.textContent='Business Memory';
   document.querySelectorAll('#nav button').forEach(x=>x.classList.toggle('active',x.id==='memoryNav'));
-  $('#side')?.classList.remove('open');
+  window.msboCloseMenu?.();
   if(!loadSession()){
     app.innerHTML='<div class="toolhead"><div><span class="kicker">PRO OPERATING LAYER</span><h2>Business Memory</h2><p class="muted">Give Brand OS durable context so recommendations do not start from zero every session.</p></div><span class="source">CLOUD</span></div><div class="card"><h3>Sign in first</h3><p>Business Memory is attached to your secure account and is not stored as anonymous browser data.</p><button id="memorySignIn" class="primary">Sign in</button></div>';
     $('#memorySignIn').onclick=()=>$('#authBtn')?.click();return;
