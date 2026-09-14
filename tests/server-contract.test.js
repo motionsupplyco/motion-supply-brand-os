@@ -85,7 +85,10 @@ test('Stripe subscription sync ignores events for deleted Brand OS users',()=>{
 test('account lifecycle includes user-scoped password recovery and authenticated deletion',()=>{
   assert.match(server,/app\.post\('\/api\/auth\/recover'/);
   assert.match(server,/resetPasswordForEmail/);
-  const updateRoute=server.match(/app\.post\('\/api\/auth\/update-password'[\s\S]*?\}\);/)?.[0]||'';
+  const updateStart=server.indexOf("app.post('/api/auth/update-password'");
+  const updateEnd=server.indexOf("app.get('/api/account'",updateStart);
+  const updateRoute=updateStart>=0&&updateEnd>updateStart?server.slice(updateStart,updateEnd):'';
+  assert.ok(updateRoute,'password update route must exist');
   assert.match(updateRoute,/Authorization:`Bearer \$\{token\}`/);
   assert.match(updateRoute,/userClient\.auth\.getUser\(\)/);
   assert.match(updateRoute,/userClient\.auth\.updateUser\(\{password\}\)/);
