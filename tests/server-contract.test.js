@@ -12,7 +12,7 @@ test('paid cloud features have server-side entitlement enforcement',()=>{
   assert.match(server,/Free accounts can save up to 5 SKUs/);
   assert.match(server,/app\.post\('\/api\/import-summaries'.*requireProUser/s);
   assert.match(server,/app\.get\('\/api\/business-memory'.*requireProUser/s);
-  assert.match(server,/app\.put\('\/api\/business-memory'.*requireProUser/s);
+  assert.match(server,/app\.put\('\/api\/business-memory\/:key'.*requireProUser/s);
   assert.match(server,/app\.delete\('\/api\/business-memory\/:id'.*requireProUser/s);
 });
 
@@ -60,8 +60,9 @@ test('security contract includes request IDs, CSP, no-store API responses, and r
 });
 
 test('public config exposes legal and support destinations without secrets',()=>{
-  assert.match(server,/supportUrl:process\.env\.SUPPORT_URL/);
-  assert.match(server,/privacyUrl:process\.env\.PRIVACY_URL/);
-  assert.match(server,/termsUrl:process\.env\.TERMS_URL/);
-  assert.doesNotMatch(server,/SUPABASE_SERVICE_ROLE_KEY.*res\.json/s);
+  const publicConfig=server.match(/app\.get\('\/api\/public-config',[\s\S]*?\}\)\);/)?.[0]||'';
+  assert.match(publicConfig,/supportUrl:process\.env\.SUPPORT_URL/);
+  assert.match(publicConfig,/privacyUrl:process\.env\.PRIVACY_URL/);
+  assert.match(publicConfig,/termsUrl:process\.env\.TERMS_URL/);
+  assert.doesNotMatch(publicConfig,/SUPABASE_(?:SERVICE_ROLE|SECRET)_KEY|STRIPE_SECRET_KEY|STRIPE_WEBHOOK_SECRET/);
 });
