@@ -1,0 +1,53 @@
+name: Repair session reliability
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'p0-production-hardening'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+      - name: Preserve sessions across transient cloud failures
+        shell: python
+        run: |
+          from pathlib import Path
+          p=Path('public/app.js')
+          text=p.read_text()
+
+          old="  const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||`Request failed (${r.status})`);return j"
+          new="  const j=await r.json().catch(()=>({}));if(!r.ok){const e=new Error(j.error||`Request failed (${r.status})`);e.status=r.status;e.code=j.code||null;throw e}return j"
+          if new not in text:
+            assert text.count(old)==1, 'api error anchor changed'
+            text=text.replace(old,new)
+
+          old="async function refreshAccount(){if(!session){entitlement={plan:config.authConfigured?'free':'local',active:false,billingManageable:false,limits:{brands:1,skus:5},usage:{brands:0,skus:0}};brands=[];skus=[];updateAccount();return}try{const acct=await api('/api/account','GET',null,true);entitlement={plan:acct.plan,active:acct.active,billingManageable:Boolean(acct.billingManageable),limits:acct.limits||{brands:1,skus:5},usage:acct.usage||{brands:0,skus:0}};await loadCloud()}catch(e){storeSession(null);brands=[];skus=[];entitlement={plan:'free',active:false,billingManageable:false,limits:{brands:1,skus:5},usage:{brands:0,skus:0}}}updateAccount()}"
+          new="async function refreshAccount(){if(!session){entitlement={plan:config.authConfigured?'free':'local',active:false,billingManageable:false,limits:{brands:1,skus:5},usage:{brands:0,skus:0}};brands=[];skus=[];updateAccount();return}let acct;try{acct=await api('/api/account','GET',null,true)}catch(e){if(e.status===401){storeSession(null);brands=[];skus=[];entitlement={plan:'free',active:false,billingManageable:false,limits:{brands:1,skus:5},usage:{brands:0,skus:0}}}else console.error('refresh-account',e);updateAccount();return}entitlement={plan:acct.plan,active:acct.active,billingManageable:Boolean(acct.billingManageable),limits:acct.limits||{brands:1,skus:5},usage:acct.usage||{brands:0,skus:0}};try{await loadCloud()}catch(e){console.error('load-cloud',e)}updateAccount()}"
+          if new not in text:
+            assert text.count(old)==1, 'refreshAccount anchor changed'
+            text=text.replace(old,new)
+
+          p.write_text(text)
+      - name: Verify syntax and tests
+        run: |
+          node --check public/app.js
+          npm test
+      - name: Commit patch if needed
+        run: |
+          if git diff --quiet -- public/app.js; then
+            echo "session reliability already patched"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/app.js
+          git commit -m "Preserve sessions across transient cloud failures"
+          git push origin HEAD:${{ github.head_ref }}
