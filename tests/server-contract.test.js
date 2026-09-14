@@ -7,6 +7,7 @@ const webhookState=await readFile(new URL('../lib/stripe-webhook-state.js',impor
 const schema=await readFile(new URL('../sql/schema.sql',import.meta.url),'utf8');
 const p0=await readFile(new URL('../sql/p0_production_migration.sql',import.meta.url),'utf8');
 const webhookMigration=await readFile(new URL('../sql/p0_webhook_idempotency.sql',import.meta.url),'utf8');
+const webhookRetryMigration=await readFile(new URL('../sql/p0_webhook_retry_reclaim.sql',import.meta.url),'utf8');
 const deletionAuditFix=await readFile(new URL('../sql/p0_account_deletion_audit_fix.sql',import.meta.url),'utf8');
 const memoryUi=await readFile(new URL('../public/business-memory-ui.js',import.meta.url),'utf8');
 const accountUi=await readFile(new URL('../public/account-ui.js',import.meta.url),'utf8');
@@ -72,6 +73,12 @@ test('P0 billing lifecycle persists cancellation, trial, invoice, and atomic web
   assert.match(webhookMigration,/create or replace function public\.claim_stripe_webhook_event/);
   assert.match(webhookMigration,/on conflict \(event_id\) do nothing/);
   assert.match(webhookMigration,/revoke all on function public\.claim_stripe_webhook_event/);
+  assert.match(webhookRetryMigration,/add column if not exists claimed_at timestamptz not null default now\(\)/);
+  assert.match(webhookRetryMigration,/on conflict \(event_id\) do update/);
+  assert.match(webhookRetryMigration,/status = 'failed'/);
+  assert.match(webhookRetryMigration,/claimed_at < now\(\) - interval '15 minutes'/);
+  assert.match(webhookRetryMigration,/attempts = public\.stripe_webhook_events\.attempts \+ 1/);
+  assert.match(webhookRetryMigration,/revoke all on function public\.claim_stripe_webhook_event/);
   assert.match(server,/cancel_at_period_end/);
 });
 
