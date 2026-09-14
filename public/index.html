@@ -10,10 +10,13 @@
 </head>
 <body>
 <div class="shell">
-  <aside class="side" id="side">
-    <div class="brand">
-      <div class="mark">MS</div>
-      <div class="brandcopy"><b>MOTION SUPPLY</b><small>BRAND OS</small></div>
+  <aside class="side" id="side" aria-label="Main navigation">
+    <div class="sideTop">
+      <div class="brand">
+        <div class="mark">MS</div>
+        <div class="brandcopy"><b>MOTION SUPPLY</b><small>BRAND OS</small></div>
+      </div>
+      <button id="menuCloseBtn" class="menuClose" type="button" aria-label="Close navigation">×</button>
     </div>
     <div class="navlabel">OPERATE</div>
     <nav id="nav">
@@ -49,10 +52,11 @@
       <button id="freshBtn" class="ghost subtle">Start fresh</button>
     </div>
   </aside>
+  <button id="menuBackdrop" class="menuBackdrop" type="button" aria-label="Close navigation"></button>
   <main>
     <header>
       <div class="headleft">
-        <button id="menuBtn" class="menu" aria-label="Open navigation">☰</button>
+        <button id="menuBtn" class="menu" aria-label="Open navigation" aria-expanded="false">☰</button>
         <div>
           <span class="eyebrow">MOTION SUPPLY CO.</span>
           <h1 id="title">Business Health</h1>
