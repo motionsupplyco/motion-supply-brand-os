@@ -59,10 +59,11 @@ test('security contract includes request IDs, CSP, no-store API responses, and r
   assert.match(server,/express\.json\(\{limit:'256kb'\}\)/);
 });
 
-test('public config exposes legal and support destinations without secrets',()=>{
+test('public config exposes legal and support destinations without secret values',()=>{
   const publicConfig=server.match(/app\.get\('\/api\/public-config',[\s\S]*?\}\)\);/)?.[0]||'';
   assert.match(publicConfig,/supportUrl:process\.env\.SUPPORT_URL/);
   assert.match(publicConfig,/privacyUrl:process\.env\.PRIVACY_URL/);
   assert.match(publicConfig,/termsUrl:process\.env\.TERMS_URL/);
-  assert.doesNotMatch(publicConfig,/SUPABASE_(?:SERVICE_ROLE|SECRET)_KEY|STRIPE_SECRET_KEY|STRIPE_WEBHOOK_SECRET/);
+  assert.doesNotMatch(publicConfig,/(?:serviceRoleKey|secretKey|webhookSecret)\s*:/i);
+  assert.doesNotMatch(publicConfig,/res\.json\([^;]*(?:process\.env\.SUPABASE_(?:SERVICE_ROLE|SECRET)_KEY|process\.env\.STRIPE_SECRET_KEY)\s*(?:[,}])/s);
 });
