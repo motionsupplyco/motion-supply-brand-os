@@ -82,11 +82,14 @@ test('Stripe subscription sync ignores events for deleted Brand OS users',()=>{
   assert.ok(sync.indexOf('getUserById(userId)')<sync.indexOf("from('subscriptions').upsert"),'auth-user existence must be checked before subscription upsert');
 });
 
-test('account lifecycle includes complete password recovery and authenticated deletion',()=>{
+test('account lifecycle includes user-scoped password recovery and authenticated deletion',()=>{
   assert.match(server,/app\.post\('\/api\/auth\/recover'/);
   assert.match(server,/resetPasswordForEmail/);
-  assert.match(server,/app\.post\('\/api\/auth\/update-password'/);
-  assert.match(server,/admin\.auth\.admin\.updateUserById/);
+  const updateRoute=server.match(/app\.post\('\/api\/auth\/update-password'[\s\S]*?\}\);/)?.[0]||'';
+  assert.match(updateRoute,/Authorization:`Bearer \$\{token\}`/);
+  assert.match(updateRoute,/userClient\.auth\.getUser\(\)/);
+  assert.match(updateRoute,/userClient\.auth\.updateUser\(\{password\}\)/);
+  assert.doesNotMatch(updateRoute,/admin\.auth\.admin\.updateUserById/);
   assert.match(server,/app\.delete\('\/api\/account'/);
   assert.match(server,/admin\.auth\.admin\.deleteUser/);
   assert.match(server,/status:'completed',completed_at:new Date\(\)\.toISOString\(\)/);
