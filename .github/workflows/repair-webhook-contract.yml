@@ -1,0 +1,43 @@
+name: Repair webhook contract test
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'p0-production-hardening'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+      - name: Update webhook contract expectation
+        shell: python
+        run: |
+          from pathlib import Path
+          p=Path('tests/server-contract.test.js')
+          text=p.read_text()
+          old="  assert.match(webhookMigration,/on conflict \\(event_id\\) do nothing/);"
+          new="  assert.match(webhookMigration,/on conflict \\(event_id\\) do update/);\n  assert.match(webhookMigration,/status = 'failed'/);\n  assert.match(webhookMigration,/claimed_at < now\\(\\) - interval '15 minutes'/);"
+          if new not in text:
+            assert text.count(old)==1, 'webhook contract anchor changed'
+            text=text.replace(old,new)
+          p.write_text(text)
+      - name: Run tests
+        run: npm test
+      - name: Commit patch if needed
+        run: |
+          if git diff --quiet -- tests/server-contract.test.js; then
+            echo "contract already updated"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add tests/server-contract.test.js
+          git commit -m "Align webhook contract with retry-safe claim"
+          git push origin HEAD:${{ github.head_ref }}
