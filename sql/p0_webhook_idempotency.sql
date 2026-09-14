@@ -7,7 +7,8 @@ alter table public.stripe_webhook_events
   add column if not exists attempts integer not null default 1;
 
 alter table public.stripe_webhook_events
-  alter column processed_at drop default;
+  alter column processed_at drop default,
+  alter column processed_at drop not null;
 
 do $$ begin
   alter table public.stripe_webhook_events
