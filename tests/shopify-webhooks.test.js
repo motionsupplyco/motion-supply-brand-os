@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
-import {SHOPIFY_WEBHOOK_TOPICS,SHOPIFY_WEBHOOK_LIST_QUERY,SHOPIFY_WEBHOOK_CREATE_MUTATION,SHOPIFY_WEBHOOK_CLAIM_STALE_MS,verifyShopifyWebhookHmac,classifyShopifyWebhookDuplicate,claimShopifyWebhookEvent,ensureShopifyWebhooks} from '../lib/shopify-webhooks.js';
+import {SHOPIFY_WEBHOOK_TOPICS,SHOPIFY_WEBHOOK_LIST_QUERY,SHOPIFY_WEBHOOK_CREATE_MUTATION,SHOPIFY_WEBHOOK_CLAIM_STALE_MS,verifyShopifyWebhookHmac,classifyShopifyWebhookDuplicate,claimShopifyWebhookEvent,finalizeShopifyWebhookEvent,ensureShopifyWebhooks} from '../lib/shopify-webhooks.js';
 
 function fakeWebhookAdmin(initial=null,{loseReclaim=false}={}){
   let state=initial?{provider:'shopify',event_id:'evt_1',event_type:'ORDERS_CREATE',...initial}:null;
@@ -27,7 +27,7 @@ function fakeWebhookAdmin(initial=null,{loseReclaim=false}={}){
           const matches=state&&Object.entries(filters).every(([key,value])=>state[key]===value);
           if(!matches)return {data:null,error:null};
           state={...state,...patch};
-          return {data:{attempts:state.attempts},error:null};
+          return {data:{status:state.status,attempts:state.attempts},error:null};
         }
       };
       return builder;
@@ -62,11 +62,12 @@ test('same webhook ID with a different payload hash is rejected instead of silen
 
 test('new webhook claim stores a processing row with one attempt',async()=>{
   const admin=fakeWebhookAdmin();
-  const result=await claimShopifyWebhookEvent({admin,eventId:'evt_1',eventType:'ORDERS_CREATE',payloadHash:'hash-1',now:new Date('2026-09-15T08:30:00.000Z')});
-  assert.deepEqual(result,{claimed:true,reclaimed:false,attempts:1});
+  const claimedAt='2026-09-15T08:30:00.000Z';
+  const result=await claimShopifyWebhookEvent({admin,eventId:'evt_1',eventType:'ORDERS_CREATE',payloadHash:'hash-1',now:new Date(claimedAt)});
+  assert.deepEqual(result,{claimed:true,reclaimed:false,attempts:1,claimedAt});
   assert.equal(admin.state().status,'processing');
   assert.equal(admin.state().attempts,1);
-  assert.equal(admin.state().claimed_at,'2026-09-15T08:30:00.000Z');
+  assert.equal(admin.state().claimed_at,claimedAt);
 });
 
 test('failed webhook claim is atomically reclaimed and attempt count increments',async()=>{
@@ -75,10 +76,37 @@ test('failed webhook claim is atomically reclaimed and attempt count increments'
   assert.equal(result.claimed,true);
   assert.equal(result.reclaimed,true);
   assert.equal(result.attempts,2);
+  assert.equal(result.claimedAt,'2026-09-15T08:30:00.000Z');
   assert.equal(admin.state().status,'processing');
   assert.equal(admin.state().attempts,2);
   assert.equal(admin.state().processed_at,null);
   assert.equal(admin.state().failure_reason,null);
+});
+
+test('active claim token can finalize completed or failed state',async()=>{
+  const completedAdmin=fakeWebhookAdmin();
+  const completeClaim=await claimShopifyWebhookEvent({admin:completedAdmin,eventId:'evt_1',eventType:'ORDERS_CREATE',payloadHash:'hash-1',now:new Date('2026-09-15T08:30:00.000Z')});
+  const completed=await finalizeShopifyWebhookEvent({admin:completedAdmin,eventId:'evt_1',claim:completeClaim,status:'completed',now:new Date('2026-09-15T08:31:00.000Z')});
+  assert.equal(completed.updated,true);
+  assert.equal(completedAdmin.state().status,'completed');
+  assert.equal(completedAdmin.state().failure_reason,null);
+
+  const failedAdmin=fakeWebhookAdmin();
+  const failedClaim=await claimShopifyWebhookEvent({admin:failedAdmin,eventId:'evt_1',eventType:'ORDERS_CREATE',payloadHash:'hash-1',now:new Date('2026-09-15T08:30:00.000Z')});
+  const failed=await finalizeShopifyWebhookEvent({admin:failedAdmin,eventId:'evt_1',claim:failedClaim,status:'failed',failureReason:'temporary error',now:new Date('2026-09-15T08:31:00.000Z')});
+  assert.equal(failed.updated,true);
+  assert.equal(failedAdmin.state().status,'failed');
+  assert.equal(failedAdmin.state().failure_reason,'temporary error');
+});
+
+test('superseded webhook claim cannot overwrite the newer attempt final state',async()=>{
+  const admin=fakeWebhookAdmin({status:'processing',attempts:2,claimed_at:'2026-09-15T08:30:00.000Z',payload_sha256:'hash-1'});
+  const staleClaim={claimed:true,reclaimed:false,attempts:1,claimedAt:'2026-09-15T08:00:00.000Z'};
+  const result=await finalizeShopifyWebhookEvent({admin,eventId:'evt_1',claim:staleClaim,status:'completed',now:new Date('2026-09-15T08:31:00.000Z')});
+  assert.deepEqual(result,{updated:false,stale:true});
+  assert.equal(admin.state().status,'processing');
+  assert.equal(admin.state().attempts,2);
+  assert.equal(admin.state().claimed_at,'2026-09-15T08:30:00.000Z');
 });
 
 test('completed webhook stays deduped and a lost reclaim race does not double-process',async()=>{
