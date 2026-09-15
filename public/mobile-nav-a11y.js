@@ -45,10 +45,10 @@ function trapDrawerFocus(event){
   }
 }
 
-function closeDrawerAfterNavSelection(event){
+function closeDrawerAfterMenuAction(event){
   if(!mobileQuery.matches||!isOpen())return;
   const target=event.target instanceof Element?event.target:null;
-  if(!target?.closest('#nav button'))return;
+  if(!target?.closest('#nav button,#demoBtn,#freshBtn,#learnBtn'))return;
   if(typeof window.msboCloseMenu==='function'){
     window.msboCloseMenu();
     return;
@@ -62,7 +62,7 @@ function closeDrawerAfterNavSelection(event){
 if(side){
   new MutationObserver(syncDrawerAccessibility).observe(side,{attributes:true,attributeFilter:['class']});
   document.addEventListener('keydown',trapDrawerFocus);
-  document.addEventListener('click',closeDrawerAfterNavSelection);
+  document.addEventListener('click',closeDrawerAfterMenuAction);
   if(typeof mobileQuery.addEventListener==='function')mobileQuery.addEventListener('change',syncDrawerAccessibility);
   else if(typeof mobileQuery.addListener==='function')mobileQuery.addListener(syncDrawerAccessibility);
   syncDrawerAccessibility();
