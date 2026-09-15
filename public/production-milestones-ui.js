@@ -30,6 +30,7 @@ function timelineInputFromDom(){
   return input;
 }
 function timelineFromCurrentPreflight(){return productionTimeline(timelineInputFromDom())}
+function trackerSignature({today,timeline,actuals}){return JSON.stringify({context:contextKey(),today,timeline,actuals})}
 
 const STATUS={
   unscheduled:{label:'UNSCHEDULED',tone:'neutral'},scheduled:{label:'SCHEDULED',tone:'neutral'},upcoming:{label:'UPCOMING',tone:'neutral'},due_soon:{label:'DUE SOON',tone:'warn'},overdue:{label:'MODELED DATE MISSED',tone:'bad'},completed_on_time:{label:'COMPLETE · ON/BEFORE PLAN',tone:'good'},completed_late:{label:'COMPLETE · AFTER PLAN',tone:'warn'},completed_unscheduled:{label:'COMPLETE · NO PLAN DATE',tone:'good'},invalid_future_actual:{label:'CHECK ACTUAL DATE',tone:'bad'}
@@ -62,8 +63,11 @@ function renderTracker(){
   if(String($('#title')?.textContent||'').trim()!=='Production Preflight')return;
   const timelinePanel=$('#productionTimelinePanel');if(!timelinePanel)return;
   const actuals=loadActuals();const today=todayIso();const timeline=timelineFromCurrentPreflight();const result=buildProductionMilestones({timeline,actuals,asOfDate:today});
+  const signature=trackerSignature({today,timeline,actuals});
   let panel=$('#productionMilestonesPanel');
   if(!panel){panel=document.createElement('section');panel.id='productionMilestonesPanel';panel.className='productionMilestonesPanel';const cash=$('#manufacturingCashTiming');if(cash)cash.insertAdjacentElement('beforebegin',panel);else timelinePanel.insertAdjacentElement('afterend',panel)}
+  if(panel.dataset.renderSignature===signature)return;
+  panel.dataset.renderSignature=signature;
   const tone=result.status==='needs_attention'?'bad':result.status==='complete'?'good':'signal';
   const next=result.nextMilestone?`${result.nextMilestone.label} · ${result.nextMilestone.plannedDate}`:'No open modeled milestone';
   panel.innerHTML=`<div class="productionMilestoneHead"><div><span class="kicker">LIVE PRODUCTION TRACKER</span><h3>Record what actually happened against the modeled production path.</h3></div><span class="v2Badge ${tone}">${result.status==='needs_attention'?'NEEDS ATTENTION':result.status==='complete'?'TRACKED PLAN COMPLETE':result.status==='unscoped'?'TIMELINE NEEDED':'ACTIVE RUN'}</span></div>
