@@ -41,6 +41,7 @@ jobs:
           node --check public/collection-stress.js
           node --check public/net-profit-guardrails.js
           node --check public/production-preflight.js
+          node --check public/production-timeline.js
           node --check public/manufacturing-cash-transfer.js
           node --check public/v2-operating-ui.js
           node --check public/v2-planning-ui.js
