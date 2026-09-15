@@ -17,7 +17,7 @@ test('Foundry Eight demo opens the new founder workspaces without uncaught brows
 
   const routes=[
     ['[data-profit-view="profitguardrails"]','Profit Guardrails'],
-    ['[data-collection-view="collectionstress"]','Collection Stress'],
+    ['[data-collection-view="collectionstress"]','Collection Stress Tester'],
     ['[data-production-view="preflight"]','Production Preflight'],
     ['[data-factory-view="quotecompare"]','Factory Quote Compare'],
     ['[data-v2-view="cashforecast"]','Cash Forecast'],
