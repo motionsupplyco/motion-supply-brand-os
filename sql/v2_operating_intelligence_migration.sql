@@ -2,6 +2,10 @@
 -- ADDITIVE ONLY. Do not run until the V2 server/UI branch has passed CI and preview review.
 -- Sensitive integration credentials remain server-only; provider tokens are encrypted before insert.
 
+-- Existing skus.id is already globally unique, but this composite unique index lets V2 foreign keys
+-- also prove that an optional sku_id belongs to the same brand and owner as the V2 row.
+create unique index if not exists skus_id_brand_owner_key on public.skus(id, brand_id, owner_id);
+
 create table if not exists public.integration_connections (
   id uuid primary key default gen_random_uuid(),
   owner_id uuid not null references auth.users(id) on delete cascade,
@@ -87,7 +91,7 @@ create table if not exists public.inventory_snapshots (
   source_payload jsonb not null default '{}'::jsonb,
   captured_at timestamptz not null default now(),
   constraint inventory_snapshots_brand_owner_fk foreign key (brand_id, owner_id) references public.brands(id, owner_id) on delete cascade,
-  constraint inventory_snapshots_sku_fk foreign key (sku_id) references public.skus(id) on delete set null
+  constraint inventory_snapshots_sku_owner_fk foreign key (sku_id, brand_id, owner_id) references public.skus(id, brand_id, owner_id) on delete set null (sku_id)
 );
 create index if not exists inventory_snapshots_brand_time_idx on public.inventory_snapshots(owner_id, brand_id, captured_at desc);
 create index if not exists inventory_snapshots_external_idx on public.inventory_snapshots(owner_id, brand_id, source, external_variant_id, captured_at desc);
@@ -103,6 +107,7 @@ create table if not exists public.sku_planning_settings (
   external_variant_id text,
   sku_code text,
   label text,
+  manual_weekly_demand numeric(14,4) check (manual_weekly_demand is null or manual_weekly_demand >= 0),
   lead_weeks numeric(8,2) not null default 0 check (lead_weeks >= 0),
   high_weekly_demand numeric(14,4) check (high_weekly_demand is null or high_weekly_demand >= 0),
   moq integer not null default 0 check (moq >= 0),
@@ -113,7 +118,7 @@ create table if not exists public.sku_planning_settings (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint sku_planning_brand_owner_fk foreign key (brand_id, owner_id) references public.brands(id, owner_id) on delete cascade,
-  constraint sku_planning_sku_fk foreign key (sku_id) references public.skus(id) on delete set null,
+  constraint sku_planning_sku_owner_fk foreign key (sku_id, brand_id, owner_id) references public.skus(id, brand_id, owner_id) on delete set null (sku_id),
   unique(owner_id, brand_id, item_key)
 );
 create index if not exists sku_planning_owner_brand_idx on public.sku_planning_settings(owner_id, brand_id, updated_at desc);
