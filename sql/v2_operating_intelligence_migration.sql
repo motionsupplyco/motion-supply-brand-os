@@ -84,6 +84,7 @@ create table if not exists public.inventory_snapshots (
   committed integer,
   incoming integer,
   weekly_velocity numeric(14,4),
+  source_payload jsonb not null default '{}'::jsonb,
   captured_at timestamptz not null default now(),
   constraint inventory_snapshots_brand_owner_fk foreign key (brand_id, owner_id) references public.brands(id, owner_id) on delete cascade,
   constraint inventory_snapshots_sku_fk foreign key (sku_id) references public.skus(id) on delete set null
