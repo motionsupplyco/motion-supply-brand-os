@@ -1,7 +1,39 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
-import {SHOPIFY_WEBHOOK_TOPICS,SHOPIFY_WEBHOOK_LIST_QUERY,SHOPIFY_WEBHOOK_CREATE_MUTATION,SHOPIFY_WEBHOOK_CLAIM_STALE_MS,verifyShopifyWebhookHmac,classifyShopifyWebhookDuplicate,ensureShopifyWebhooks} from '../lib/shopify-webhooks.js';
+import {SHOPIFY_WEBHOOK_TOPICS,SHOPIFY_WEBHOOK_LIST_QUERY,SHOPIFY_WEBHOOK_CREATE_MUTATION,SHOPIFY_WEBHOOK_CLAIM_STALE_MS,verifyShopifyWebhookHmac,classifyShopifyWebhookDuplicate,claimShopifyWebhookEvent,ensureShopifyWebhooks} from '../lib/shopify-webhooks.js';
+
+function fakeWebhookAdmin(initial=null,{loseReclaim=false}={}){
+  let state=initial?{provider:'shopify',event_id:'evt_1',event_type:'ORDERS_CREATE',...initial}:null;
+  return {
+    state:()=>state,
+    from(table){
+      assert.equal(table,'integration_webhook_events');
+      const filters={};let patch=null;
+      const builder={
+        async insert(row){
+          if(!state){state={...row};return {error:null}}
+          return {error:{code:'23505',message:'duplicate'}};
+        },
+        select(){return builder},
+        update(value){patch=value;return builder},
+        eq(key,value){filters[key]=value;return builder},
+        async maybeSingle(){
+          if(!patch){
+            if(!state)return {data:null,error:null};
+            return {data:{status:state.status,attempts:state.attempts,claimed_at:state.claimed_at,payload_sha256:state.payload_sha256},error:null};
+          }
+          if(loseReclaim)return {data:null,error:null};
+          const matches=state&&Object.entries(filters).every(([key,value])=>state[key]===value);
+          if(!matches)return {data:null,error:null};
+          state={...state,...patch};
+          return {data:{attempts:state.attempts},error:null};
+        }
+      };
+      return builder;
+    }
+  };
+}
 
 test('Shopify webhook verifier authenticates the raw body with base64 HMAC',()=>{
   const body=Buffer.from('{"id":123,"topic":"orders/create"}');
@@ -26,6 +58,41 @@ test('active processing claims dedupe while stale claims can be reclaimed',()=>{
 
 test('same webhook ID with a different payload hash is rejected instead of silently deduped',()=>{
   assert.deepEqual(classifyShopifyWebhookDuplicate({status:'failed',payload_sha256:'original',claimed_at:'2026-09-15T08:00:00.000Z'},{payloadHash:'different'}),{action:'reject',reason:'payload_mismatch'});
+});
+
+test('new webhook claim stores a processing row with one attempt',async()=>{
+  const admin=fakeWebhookAdmin();
+  const result=await claimShopifyWebhookEvent({admin,eventId:'evt_1',eventType:'ORDERS_CREATE',payloadHash:'hash-1',now:new Date('2026-09-15T08:30:00.000Z')});
+  assert.deepEqual(result,{claimed:true,reclaimed:false,attempts:1});
+  assert.equal(admin.state().status,'processing');
+  assert.equal(admin.state().attempts,1);
+  assert.equal(admin.state().claimed_at,'2026-09-15T08:30:00.000Z');
+});
+
+test('failed webhook claim is atomically reclaimed and attempt count increments',async()=>{
+  const admin=fakeWebhookAdmin({status:'failed',attempts:1,claimed_at:'2026-09-15T08:00:00.000Z',payload_sha256:'hash-1',processed_at:'2026-09-15T08:01:00.000Z',failure_reason:'temporary failure'});
+  const result=await claimShopifyWebhookEvent({admin,eventId:'evt_1',eventType:'ORDERS_CREATE',payloadHash:'hash-1',now:new Date('2026-09-15T08:30:00.000Z')});
+  assert.equal(result.claimed,true);
+  assert.equal(result.reclaimed,true);
+  assert.equal(result.attempts,2);
+  assert.equal(admin.state().status,'processing');
+  assert.equal(admin.state().attempts,2);
+  assert.equal(admin.state().processed_at,null);
+  assert.equal(admin.state().failure_reason,null);
+});
+
+test('completed webhook stays deduped and a lost reclaim race does not double-process',async()=>{
+  const complete=fakeWebhookAdmin({status:'completed',attempts:1,claimed_at:'2026-09-15T08:00:00.000Z',payload_sha256:'hash-1'});
+  const duplicate=await claimShopifyWebhookEvent({admin:complete,eventId:'evt_1',eventType:'ORDERS_CREATE',payloadHash:'hash-1',now:new Date('2026-09-15T08:30:00.000Z')});
+  assert.equal(duplicate.claimed,false);
+  assert.equal(duplicate.duplicate,true);
+  assert.equal(duplicate.status,'completed');
+
+  const raced=fakeWebhookAdmin({status:'failed',attempts:2,claimed_at:'2026-09-15T08:00:00.000Z',payload_sha256:'hash-1'},{loseReclaim:true});
+  const lost=await claimShopifyWebhookEvent({admin:raced,eventId:'evt_1',eventType:'ORDERS_CREATE',payloadHash:'hash-1',now:new Date('2026-09-15T08:30:00.000Z')});
+  assert.equal(lost.claimed,false);
+  assert.equal(lost.duplicate,true);
+  assert.equal(lost.reason,'claim_lost');
 });
 
 test('webhook registration only creates missing topic+URI pairs',async()=>{
