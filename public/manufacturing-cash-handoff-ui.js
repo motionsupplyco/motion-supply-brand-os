@@ -1,4 +1,5 @@
 import {productionPreflight,PRODUCTION_PREFLIGHT_CHECKS} from './production-preflight.js';
+import {productionTimeline} from './production-timeline.js';
 import {MANUFACTURING_CASH_TRANSFER_KEY,buildManufacturingCashTransfer,applyManufacturingCashTransfer} from './manufacturing-cash-transfer.js';
 
 const $=selector=>document.querySelector(selector);
@@ -9,6 +10,8 @@ const money=value=>new Intl.NumberFormat('en-US',{style:'currency',currency:'USD
 const mode=()=>localStorage.getItem('msbo_mode')||'fresh';
 const PREFLIGHT_KEY='msbo_production_preflight_v1';
 const TIMING_KEY='msbo_production_cash_timing_v1';
+const TIMELINE_KEY='msbo_production_timeline_v1';
+const DEMO_TIMELINE_KEY='msbo_demo_production_timeline_v1';
 
 function loadJson(key,fallback=null){try{return JSON.parse(localStorage.getItem(key)||'null')??fallback}catch{return fallback}}
 function saveJson(key,value){localStorage.setItem(key,JSON.stringify(value))}
@@ -51,6 +54,7 @@ function moveQuoteToPreflight(index){
   };
   saveJson(PREFLIGHT_KEY,model);
   localStorage.removeItem(TIMING_KEY);
+  localStorage.removeItem(TIMELINE_KEY);
   flash('Quote moved to Production Preflight. Readiness checks reset ✓','good');
   document.querySelector('[data-production-view="preflight"]')?.click();
 }
@@ -64,6 +68,59 @@ function enhanceQuoteCompare(){
   row.innerHTML=`<td>Production workflow</td>${headers.map((_,index)=>`<td><button class="outline quoteHandoffBtn" data-handoff-quote="${index}" ${mode().startsWith('demo')?'disabled':''}>Use in Preflight</button><small>Resets every readiness check</small></td>`).join('')}`;
   tbody.appendChild(row);
 }
+
+function timelineStorageKey(){return mode().startsWith('demo')?DEMO_TIMELINE_KEY:TIMELINE_KEY}
+function loadTimelineModel(preflight={}){
+  const saved=loadJson(timelineStorageKey(),{})||{};
+  return {
+    depositDate:saved.depositDate||'',targetLaunchDate:saved.targetLaunchDate||'',
+    productionLeadDays:saved.productionLeadDays??preflight.productionLeadDays??null,
+    inspectionDays:saved.inspectionDays??null,transitDays:saved.transitDays??null,customsBufferDays:saved.customsBufferDays??null,
+    receivingPrepDays:saved.receivingPrepDays??null,contentBufferDays:saved.contentBufferDays??null
+  };
+}
+function saveTimelineFromDom(){
+  const model=loadTimelineModel(loadJson(PREFLIGHT_KEY,{}));
+  $$('[data-timeline-key]').forEach(input=>{const key=input.dataset.timelineKey;model[key]=input.type==='date'?String(input.value||''):(input.value===''?null:Math.max(0,Math.trunc(num(input.value))))});
+  saveJson(timelineStorageKey(),model);return model;
+}
+function timelineField(key,label,value,{type='number',placeholder=''}={}){
+  return `<label><span>${esc(label)}</span><input data-timeline-key="${key}" type="${type}" ${type==='number'?'min="0" step="1"':''} value="${value??''}" placeholder="${esc(placeholder)}"></label>`;
+}
+function timelineResultHtml(model){
+  const result=productionTimeline(model);
+  const hasForward=Boolean(result.depositDate),hasTarget=Boolean(result.targetLaunchDate);
+  if(!hasForward&&!hasTarget)return `<div class="productionTimelineEmpty"><b>Add a deposit / PO date or target launch date.</b><span>Brand OS will model the path with your own calendar-day assumptions.</span></div>`;
+  const status=result.status==='late'?{label:`MODELED ${Math.abs(result.launchBufferDays)} DAYS LATE`,tone:'bad'}:result.status==='on_track'?{label:`${result.launchBufferDays} DAYS MODELED BUFFER`,tone:'good'}:{label:'TARGET DATE NOT SET',tone:'neutral'};
+  return `<div class="productionTimelineResult">
+    <div class="productionTimelineStatus"><span class="v2Badge ${status.tone}">${esc(status.label)}</span><small>${esc(result.disclaimer)}</small></div>
+    <div class="productionTimelineMetrics">
+      <div><small>PRODUCTION COMPLETE</small><b>${esc(result.productionComplete||'—')}</b></div>
+      <div><small>EST. ARRIVAL</small><b>${esc(result.estimatedArrival||'—')}</b></div>
+      <div><small>INVENTORY READY</small><b>${esc(result.inventoryReady||'—')}</b></div>
+      <div><small>EARLIEST MODELED LAUNCH</small><b>${esc(result.earliestLaunch||'—')}</b></div>
+      <div><small>LATEST MODELED DEPOSIT</small><b>${esc(result.latestDepositDate||'—')}</b></div>
+      <div><small>CRITICAL PATH</small><b>${result.totalCriticalPathDays} days</b></div>
+    </div>
+  </div>`;
+}
+function enhanceProductionTimeline(anchor){
+  if($('#productionTimelinePanel'))return $('#productionTimelinePanel');
+  const preflight=loadJson(PREFLIGHT_KEY,{});const model=loadTimelineModel(preflight);
+  const section=document.createElement('section');section.id='productionTimelinePanel';section.className='productionTimelinePanel';
+  section.innerHTML=`<div class="manufacturingCashHead"><div><span class="kicker">05 · PRODUCTION TIMELINE</span><h3>Work forward from the PO—and backward from the launch.</h3></div><span class="v2Badge signal">CALENDAR-DAY MODEL</span></div>
+    <p>Use the factory and logistics timing you actually expect. No hidden industry-average lead time is added.</p>
+    <div class="productionTimelineGrid">
+      ${timelineField('depositDate','Deposit / PO date',model.depositDate,{type:'date'})}${timelineField('targetLaunchDate','Target launch date',model.targetLaunchDate,{type:'date'})}
+      ${timelineField('productionLeadDays','Production lead · days',model.productionLeadDays,{placeholder:'35'})}${timelineField('inspectionDays','Inspection / QC · days',model.inspectionDays,{placeholder:'3'})}
+      ${timelineField('transitDays','Freight transit · days',model.transitDays,{placeholder:'12'})}${timelineField('customsBufferDays','Customs / delay buffer · days',model.customsBufferDays,{placeholder:'4'})}
+      ${timelineField('receivingPrepDays','Receiving / prep · days',model.receivingPrepDays,{placeholder:'2'})}${timelineField('contentBufferDays','Content / launch buffer · days',model.contentBufferDays,{placeholder:'7'})}
+    </div>
+    <div class="productionTimelineActions"><button class="outline" data-manufacturing-action="timeline-calc">Recalculate timeline</button><span>All durations are founder-entered calendar days, not guarantees.</span></div>
+    <div id="productionTimelineResult">${timelineResultHtml(model)}</div>`;
+  anchor.insertAdjacentElement('afterend',section);return section;
+}
+function updateTimelineResult(){const model=saveTimelineFromDom();const out=$('#productionTimelineResult');if(out)out.innerHTML=timelineResultHtml(model)}
 
 function loadTiming(){return {...{depositWeek:null,balanceWeek:null,freightDutyWeek:null,inspectionOtherWeek:null},...(loadJson(TIMING_KEY,{})||{})}}
 function saveTimingFromDom(){
@@ -93,16 +150,18 @@ function prepareCashForecast(){
   document.querySelector('[data-v2-view="cashforecast"]')?.click();
 }
 function enhancePreflight(){
-  const result=$('.preflightResult');if(!result||$('#manufacturingCashTiming'))return;
+  const result=$('.preflightResult');if(!result)return;
+  const timeline=enhanceProductionTimeline(result);
+  if($('#manufacturingCashTiming'))return;
   const timing=loadTiming();
   const section=document.createElement('section');section.id='manufacturingCashTiming';section.className='manufacturingCashPanel';
-  section.innerHTML=`<div class="manufacturingCashHead"><div><span class="kicker">05 · CASH FORECAST HANDOFF</span><h3>Put the unpaid production commitment on the 13-week cash map</h3></div><span class="v2Badge signal">REVIEW BEFORE APPLY</span></div>
+  section.innerHTML=`<div class="manufacturingCashHead"><div><span class="kicker">06 · CASH FORECAST HANDOFF</span><h3>Put the unpaid production commitment on the 13-week cash map</h3></div><span class="v2Badge signal">REVIEW BEFORE APPLY</span></div>
     <p>Choose when each known cash item is expected to leave. Brand OS will prepare a transfer for Cash Forecast—it will not change the forecast until you press Apply there.</p>
     <div class="manufacturingWeekGrid">
       ${weekField('depositWeek','Deposit week',timing.depositWeek)}${weekField('balanceWeek','Factory balance week',timing.balanceWeek)}${weekField('freightDutyWeek','Freight / duty week',timing.freightDutyWeek)}${weekField('inspectionOtherWeek','Inspection / other week',timing.inspectionOtherWeek)}
     </div>
     <div class="manufacturingCashActions"><button class="primary" data-manufacturing-action="prepare">Prepare for Cash Forecast</button><span>Sample + tooling are left manual because Preflight allows those costs to be already paid.</span></div>`;
-  result.insertAdjacentElement('afterend',section);
+  timeline.insertAdjacentElement('afterend',section);
 }
 function weekField(key,label,value){return `<label><span>${esc(label)}</span><input data-manufacturing-week="${key}" type="number" min="1" max="13" step="1" value="${value??''}" placeholder="1–13"></label>`}
 
@@ -149,11 +208,15 @@ function enhance(){
 document.addEventListener('click',event=>{
   const quote=event.target.closest('[data-handoff-quote]');if(quote){event.preventDefault();moveQuoteToPreflight(Number(quote.dataset.handoffQuote));return}
   const action=event.target.closest('[data-manufacturing-action]');if(!action)return;
+  if(action.dataset.manufacturingAction==='timeline-calc'){updateTimelineResult();return}
   if(action.dataset.manufacturingAction==='prepare'){prepareCashForecast();return}
   if(action.dataset.manufacturingAction==='apply'){applyPending();return}
   if(action.dataset.manufacturingAction==='discard'){discardPending();return}
 });
-document.addEventListener('change',event=>{if(event.target.matches('[data-manufacturing-week]'))saveTimingFromDom()});
+document.addEventListener('change',event=>{
+  if(event.target.matches('[data-manufacturing-week]'))saveTimingFromDom();
+  if(event.target.matches('[data-timeline-key]'))updateTimelineResult();
+});
 
 const app=$('#app');if(app)new MutationObserver(()=>queueMicrotask(enhance)).observe(app,{childList:true,subtree:true});
 queueMicrotask(enhance);
