@@ -118,7 +118,7 @@ export function reorderCashGate(reorder={},options={}){
 
 const severityRank=Object.freeze({critical:0,warning:1,info:2,healthy:3});
 
-export function buildOperatingAlerts({forecast=null,reorders=[],adSignal=null}={}){
+export function buildOperatingAlerts({forecast=null,reorders=[],adSignal=null,productionMilestones=null}={}){
   const alerts=[];
   if(forecast?.firstBreachWeek){
     alerts.push({
@@ -137,6 +137,22 @@ export function buildOperatingAlerts({forecast=null,reorders=[],adSignal=null}={
       title:`${label} crossed its reorder review point`,
       detail:`${Math.ceil(result.inventoryPosition)} units positioned vs ${Math.ceil(result.reorderPoint)} review point. Review ${result.reviewQuantity} units before MOQ/cash adjustments.`,
       evidence:{inventoryPosition:result.inventoryPosition,reorderPoint:result.reorderPoint,reviewQuantity:result.reviewQuantity,weeksCover:result.onHandWeeksCover,reviewCashRequired:result.reviewCashRequired}
+    });
+  }
+  const productionItems=Array.isArray(productionMilestones)?productionMilestones:productionMilestones?.milestones;
+  for(const item of Array.isArray(productionItems)?productionItems:[]){
+    if(!['overdue','due_soon'].includes(item?.status))continue;
+    const overdue=item.status==='overdue';
+    const label=String(item.label||'Production milestone');
+    const days=Math.abs(finite(item.daysUntil));
+    const timing=days===0?'today':`${days} day${days===1?'':'s'} ${overdue?'past':'away'}`;
+    alerts.push({
+      type:'production_milestone',severity:overdue?'critical':'warning',entityKey:`production:${String(item.id||label)}`,
+      title:overdue?`${label} missed its modeled date`:`${label} is due soon`,
+      detail:overdue
+        ?`Modeled date was ${String(item.plannedDate||'not set')} and is now ${timing} with no recorded actual completion. Brand OS does not infer the cause.`
+        :`Modeled date is ${String(item.plannedDate||'not set')} (${timing}). Confirm the plan and record the actual completion when it happens.`,
+      evidence:{milestoneId:item.id||null,plannedDate:item.plannedDate||null,daysUntil:item.daysUntil??null,status:item.status}
     });
   }
   if(adSignal&&Number.isFinite(Number(adSignal.spendChangePct))&&Number.isFinite(Number(adSignal.contributionChangePct))){
