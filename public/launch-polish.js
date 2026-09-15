@@ -13,12 +13,13 @@ const pct=n=>`${Number(n).toFixed(1)}%`;
 function setTextIfChanged(element,next){if(element&&element.textContent.trim()!==next)element.textContent=next}
 function patchPricing(){
   const rules=[
-    ['#billingBtn','Upgrade · '+PRO_PRICE_BUTTON],
-    ['#upgradeNow','Upgrade to Pro · '+PRO_PRICE_BUTTON],
-    ['#acctBillingOpen','Upgrade to Pro · '+PRO_PRICE_BUTTON],
-    ['#memoryUpgrade','Upgrade to Pro · '+PRO_PRICE_BUTTON]
+    ['#billingBtn','Upgrade · '+PRO_PRICE_BUTTON,'header'],
+    ['#upgradeNow','Upgrade to Pro · '+PRO_PRICE_BUTTON,'proGate'],
+    ['#acctBillingOpen','Upgrade to Pro · '+PRO_PRICE_BUTTON,'account'],
+    ['#memoryUpgrade','Upgrade to Pro · '+PRO_PRICE_BUTTON,'memory'],
+    ['[data-v2-action="upgrade"]','Upgrade to Pro · '+PRO_PRICE_BUTTON,'v2Operating']
   ];
-  for(const [selector,label] of rules){
+  for(const [selector,label,noteKey] of rules){
     const button=$(selector);
     if(!button)continue;
     const text=button.textContent.trim();
@@ -28,10 +29,10 @@ function patchPricing(){
 
     if(selector!=='#billingBtn'&&button.textContent.includes(PRO_PRICE_BUTTON)){
       const host=button.parentElement;
-      if(host&&!host.querySelector(`[data-pro-price-note="${button.id}"]`)){
+      if(host&&!host.querySelector(`[data-pro-price-note="${noteKey}"]`)){
         const note=document.createElement('p');
         note.className='mini mt';
-        note.dataset.proPriceNote=button.id;
+        note.dataset.proPriceNote=noteKey;
         note.textContent=`Brand OS Pro — ${PRO_PRICE_LABEL} · Cancel anytime.`;
         button.insertAdjacentElement('afterend',note);
       }
