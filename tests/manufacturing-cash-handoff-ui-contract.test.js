@@ -25,6 +25,17 @@ test('Production Timeline uses founder-entered dates and durations without hidde
   assert.match(ui,/productionTimeline\(model\)/);
 });
 
+test('timeline dates and cash timing are isolated by factory style and quote context',()=>{
+  assert.match(ui,/function productionContextKey/);
+  assert.match(ui,/preflight\.factoryName/);
+  assert.match(ui,/preflight\.styleName/);
+  assert.match(ui,/preflight\.quoteReference/);
+  assert.match(ui,/raw\.contextKey===productionContextKey\(preflight\)/);
+  assert.match(ui,/timing\.contextKey=productionContextKey/);
+  assert.match(ui,/model\.contextKey=productionContextKey/);
+  assert.match(ui,/resetRunScopedPanels/);
+});
+
 test('preflight handoff requires explicit 13-week timing before a positive cash line can move',()=>{
   for(const key of ['depositWeek','balanceWeek','freightDutyWeek','inspectionOtherWeek'])assert.match(ui,new RegExp(key));
   assert.match(ui,/Choose a forecast week for:/);
