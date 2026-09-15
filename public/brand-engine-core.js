@@ -11,6 +11,7 @@ const VIBES=Object.freeze({
 });
 const PREFIXES=Object.freeze(['North','South','East','West','New','True','Rare','Still','Quiet','Heavy','Cold','Night','After','First','Last','Low','High']);
 const SUFFIXES=Object.freeze(['Co','Goods','Supply','Studio','Works','Dept','Lab','Club','Uniform','Project','Division','Collective']);
+const USPTO_TRADEMARK_SEARCH_URL='https://tmsearch.uspto.gov/';
 
 export function normalizeSeedWords(input){
   const raw=Array.isArray(input)?input.join(' '):clean(input);
@@ -20,6 +21,7 @@ export function normalizeSeedWords(input){
 function titleCase(value){return clean(value).split(/\s+/).map(word=>word?word[0].toUpperCase()+word.slice(1).toLowerCase():'').join(' ')}
 function hashString(value){let h=2166136261;for(const ch of String(value)){h^=ch.charCodeAt(0);h=Math.imul(h,16777619)}return h>>>0}
 function rotate(items,seed){if(!items.length)return [];const offset=hashString(seed)%items.length;return [...items.slice(offset),...items.slice(0,offset)]}
+function regexLiteral(value){return String(value).replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}
 
 export function brandNameProfile(name){
   const normalized=titleCase(name).replace(/\s+/g,' ').trim();
@@ -37,6 +39,26 @@ export function brandNameProfile(name){
       words.length>3?'More than three words; test how it reads on a neck label and URL.':null,
       /\d/.test(normalized)?'Contains a number; make sure people know whether to type the digit or spell it.':null
     ].filter(Boolean)
+  };
+}
+
+export function trademarkSearchPlan(name){
+  const normalized=titleCase(name).replace(/\s+/g,' ').replace(/"/g,'').trim();
+  if(!normalized)return null;
+  const words=unique((normalized.match(/[a-z0-9]+/gi)||[]).map(word=>word.toLowerCase()));
+  const exactQuery=`CM:"${normalized}"`;
+  const expandedQuery=words.length?`CM:(${words.map(word=>`/.*${regexLiteral(word)}.*/`).join(' AND ')})`:exactQuery;
+  return {
+    name:normalized,
+    officialUrl:USPTO_TRADEMARK_SEARCH_URL,
+    exactQuery,
+    expandedQuery,
+    guidance:[
+      'Search the exact wording first, then expand the same words.',
+      'Also search alternative spellings, pronunciations, meanings and similar commercial impressions.',
+      'Review related goods and services; International Class 025 alone does not decide whether marks conflict.'
+    ],
+    disclaimer:'Preliminary federal trademark search workflow only. It is not a clearance opinion, registration prediction, or legal advice.'
   };
 }
 
@@ -77,9 +99,11 @@ export function generateBrandNames({seedWords=[],vibe='street',count=12}={}){
   return unique(candidates.map(titleCase)).slice(0,clamp(count,1,30)).map(name=>({
     name,
     profile:brandNameProfile(name),
+    trademark:trademarkSearchPlan(name),
     domains:domainCandidates(name),
     handles:socialHandleCandidates(name)
   }));
 }
 
 export const BRAND_ENGINE_VIBES=Object.freeze(Object.keys(VIBES));
+export const BRAND_ENGINE_USPTO_SEARCH_URL=USPTO_TRADEMARK_SEARCH_URL;
