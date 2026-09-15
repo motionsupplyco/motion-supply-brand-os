@@ -39,8 +39,10 @@ jobs:
           node --check public/help.js
           node --check public/operating-intelligence.js
           node --check public/collection-stress.js
+          node --check public/net-profit-guardrails.js
           node --check public/v2-operating-ui.js
           node --check public/v2-planning-ui.js
+          node --check public/net-profit-ui.js
           node --check public/collection-stress-ui.js
           node --check lib/stripe-webhook-state.js
           node --check lib/integration-crypto.js
