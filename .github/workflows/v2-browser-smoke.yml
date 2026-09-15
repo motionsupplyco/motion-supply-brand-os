@@ -1,0 +1,58 @@
+name: V2 Browser Smoke
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'public/**'
+      - 'browser-tests/**'
+      - '.github/workflows/v2-browser-smoke.yml'
+  workflow_dispatch:
+
+jobs:
+  browser-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install app dependencies
+        run: npm ci
+
+      - name: Install pinned Playwright test runner
+        run: npm install --no-save --package-lock=false @playwright/test@1.63.0
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Start static release fixture
+        run: |
+          python3 -m http.server 4173 --directory public > /tmp/msbo-static.log 2>&1 &
+          echo $! > /tmp/msbo-static.pid
+          for i in {1..20}; do
+            if curl -fsS http://127.0.0.1:4173/ >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/msbo-static.log
+          exit 1
+
+      - name: Run V2 interaction smoke
+        run: npx playwright test browser-tests/v2-release-smoke.spec.js --reporter=line
+
+      - name: Upload visual review screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v2-browser-screenshots
+          path: artifacts/v2-browser/
+          if-no-files-found: ignore
+          retention-days: 3

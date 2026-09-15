@@ -35,6 +35,13 @@ test('mobile drawer is inert while closed and traps Tab focus while open',()=>{
   assert.match(mobileA11y,/mobileQuery\.addEventListener\('change',syncDrawerAccessibility\)/);
 });
 
+test('every mobile sidebar selection uses the complete close path including V2 and utility actions',()=>{
+  assert.match(mobileA11y,/function closeDrawerAfterMenuAction\(event\)/);
+  assert.match(mobileA11y,/target\?\.closest\('#nav button,#demoBtn,#freshBtn,#learnBtn'\)/);
+  assert.match(mobileA11y,/window\.msboCloseMenu\(\)/);
+  assert.match(mobileA11y,/document\.addEventListener\('click',closeDrawerAfterMenuAction\)/);
+});
+
 test('Business Memory uses the complete menu close path',()=>{assert.match(memory,/window\.msboCloseMenu\?\.\(\)/);});
 
 test('delete brand closes mobile navigation before confirmation',()=>{

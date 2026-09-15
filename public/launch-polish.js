@@ -7,33 +7,39 @@ export const PRO_PRICE_LABEL=`$${PRO_PRICE_MONTHLY}/month`;
 const PRO_PRICE_BUTTON=`$${PRO_PRICE_MONTHLY}/mo`;
 
 const $=s=>document.querySelector(s);
+const $$=s=>[...document.querySelectorAll(s)];
 const money=n=>new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(Number.isFinite(+n)?+n:0);
 const pct=n=>`${Number(n).toFixed(1)}%`;
 
 function setTextIfChanged(element,next){if(element&&element.textContent.trim()!==next)element.textContent=next}
 function patchPricing(){
   const rules=[
-    ['#billingBtn','Upgrade · '+PRO_PRICE_BUTTON],
-    ['#upgradeNow','Upgrade to Pro · '+PRO_PRICE_BUTTON],
-    ['#acctBillingOpen','Upgrade to Pro · '+PRO_PRICE_BUTTON],
-    ['#memoryUpgrade','Upgrade to Pro · '+PRO_PRICE_BUTTON]
+    ['#billingBtn','Upgrade · '+PRO_PRICE_BUTTON,'header'],
+    ['#upgradeNow','Upgrade to Pro · '+PRO_PRICE_BUTTON,'proGate'],
+    ['#acctBillingOpen','Upgrade to Pro · '+PRO_PRICE_BUTTON,'account'],
+    ['#memoryUpgrade','Upgrade to Pro · '+PRO_PRICE_BUTTON,'memory'],
+    ['[data-v2-action="upgrade"]','Upgrade to Pro · '+PRO_PRICE_BUTTON,'v2Operating'],
+    ['[data-profit-action="upgrade"]','Upgrade to Pro · '+PRO_PRICE_BUTTON,'profitGuardrails'],
+    ['[data-stress-action="upgrade"]','Upgrade to Pro · '+PRO_PRICE_BUTTON,'collectionStress'],
+    ['[data-preflight-action="upgrade"]','Upgrade to Pro · '+PRO_PRICE_BUTTON,'productionPreflight'],
+    ['[data-quote-action="upgrade"]','Upgrade to Pro · '+PRO_PRICE_BUTTON,'factoryQuote']
   ];
-  for(const [selector,label] of rules){
-    const button=$(selector);
-    if(!button)continue;
-    const text=button.textContent.trim();
-    if(/manage billing|opening billing|opening checkout|saving|working/i.test(text))continue;
-    if(selector==='#upgradeNow'&&/create an account|create account/i.test(text))setTextIfChanged(button,`Create account · Pro ${PRO_PRICE_BUTTON}`);
-    else if(/upgrade/i.test(text))setTextIfChanged(button,label);
+  for(const [selector,label,noteKey] of rules){
+    for(const button of $$(selector)){
+      const text=button.textContent.trim();
+      if(/manage billing|opening billing|opening checkout|saving|working/i.test(text))continue;
+      if(selector==='#upgradeNow'&&/create an account|create account/i.test(text))setTextIfChanged(button,`Create account · Pro ${PRO_PRICE_BUTTON}`);
+      else if(/upgrade/i.test(text))setTextIfChanged(button,label);
 
-    if(selector!=='#billingBtn'&&button.textContent.includes(PRO_PRICE_BUTTON)){
-      const host=button.parentElement;
-      if(host&&!host.querySelector(`[data-pro-price-note="${button.id}"]`)){
-        const note=document.createElement('p');
-        note.className='mini mt';
-        note.dataset.proPriceNote=button.id;
-        note.textContent=`Brand OS Pro — ${PRO_PRICE_LABEL} · Cancel anytime.`;
-        button.insertAdjacentElement('afterend',note);
+      if(selector!=='#billingBtn'&&button.textContent.includes(PRO_PRICE_BUTTON)){
+        const next=button.nextElementSibling;
+        if(!next?.matches('[data-pro-price-note]')){
+          const note=document.createElement('p');
+          note.className='mini mt';
+          note.dataset.proPriceNote=noteKey;
+          note.textContent=`Brand OS Pro — ${PRO_PRICE_LABEL} · Cancel anytime.`;
+          button.insertAdjacentElement('afterend',note);
+        }
       }
     }
   }

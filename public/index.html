@@ -16,6 +16,14 @@
 <link rel="stylesheet" href="styles-hotfix.css" />
 <link rel="stylesheet" href="advisor-mobile.css" />
 <link rel="stylesheet" href="premium-theme.css" />
+<link rel="stylesheet" href="v2-operating-ui.css" />
+<link rel="stylesheet" href="v2-planning-ui.css" />
+<link rel="stylesheet" href="net-profit-ui.css" />
+<link rel="stylesheet" href="collection-stress-ui.css" />
+<link rel="stylesheet" href="production-preflight-ui.css" />
+<link rel="stylesheet" href="factory-quote-ui.css" />
+<link rel="stylesheet" href="manufacturing-cash-handoff.css" />
+<link rel="stylesheet" href="production-milestones-ui.css" />
 </head>
 <body>
 <div class="shell">
@@ -46,6 +54,15 @@
       <button data-view="cash"><span>$</span>Cash Checkpoint</button>
       <button data-view="po"><span>PO</span>PO Cash Gate</button>
       <button data-view="fulfillment"><span>↔</span>3PL Decision</button>
+      <div class="navgroup">Operating Intelligence</div>
+      <button data-profit-view="profitguardrails"><span>NP</span>Profit Guardrails</button>
+      <button data-collection-view="collectionstress"><span>CS</span>Collection Stress</button>
+      <button data-production-view="preflight"><span>PF</span>Production Preflight</button>
+      <button data-factory-view="quotecompare"><span>FQ</span>Factory Quote Compare</button>
+      <button data-v2-view="cashforecast"><span>13</span>Cash Forecast</button>
+      <button data-v2-view="reorderintel"><span>RI</span>Reorder Intelligence</button>
+      <button data-v2-view="operatingalerts"><span>!</span>Operating Alerts</button>
+      <button data-v2-view="integrations"><span>↯</span>Integrations</button>
       <div class="navgroup">Expand & Organize</div>
       <button data-view="wholesale"><span>◇</span>Wholesale Economics</button>
       <button data-view="brands"><span>▤</span>Brands & SKUs</button>
@@ -76,7 +93,17 @@
 <div id="modal" class="modal hidden"><div class="modalbox" role="dialog" aria-modal="true" aria-label="Brand OS dialog" tabindex="-1"><button id="closeModal" class="close" type="button" aria-label="Close dialog">×</button><div id="modalBody"></div></div></div>
 <script type="module" src="account-ui.js"></script>
 <script type="module" src="business-memory-ui.js"></script>
+<script type="module" src="workspace-route.js"></script>
 <script type="module" src="app.js"></script>
+<script type="module" src="v2-operating-ui.js"></script>
+<script type="module" src="v2-planning-ui.js"></script>
+<script type="module" src="net-profit-ui.js"></script>
+<script type="module" src="collection-stress-ui.js"></script>
+<script type="module" src="production-preflight-ui.js"></script>
+<script type="module" src="factory-quote-ui.js"></script>
+<script type="module" src="manufacturing-cash-handoff-ui.js"></script>
+<script type="module" src="production-milestones-ui.js"></script>
+<script type="module" src="production-alert-bridge-ui.js"></script>
 <script type="module" src="advisor-resources.js"></script>
 <script type="module" src="mobile-nav-a11y.js"></script>
 <script type="module" src="modal-a11y.js"></script>
