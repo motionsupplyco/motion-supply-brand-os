@@ -5,6 +5,7 @@ const $=selector=>document.querySelector(selector);
 const $$=selector=>[...document.querySelectorAll(selector)];
 const esc=value=>String(value??'').replace(/[&<>\'\"]/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char]));
 const loadSession=()=>{try{return JSON.parse(localStorage.getItem('msbo_session')||'null')}catch{return null}};
+const entrypoint=()=>new URLSearchParams(location.search).get('src')==='sidebar'?'sidebar':'standalone';
 let currentNames=[];
 
 function toast(message,tone='neutral'){
@@ -16,7 +17,7 @@ function generate({track=true}={}){
   const count=Number($('#nameCount')?.value)||12;
   currentNames=generateBrandNames({seedWords,vibe,count});
   renderNames();
-  if(track)trackBrandEngine('brand_engine_names_generated',{vibe,count:currentNames.length,entrypoint:'standalone'});
+  if(track)trackBrandEngine('brand_engine_names_generated',{vibe,count:currentNames.length,entrypoint:entrypoint()});
 }
 function profileHtml(profile){
   const chips=[`${profile.words} word${profile.words===1?'':'s'}`,`${profile.characters} characters`,profile.easyHandle?'handle-friendly':'may need shorter handle'].map(text=>`<span class="chip">${esc(text)}</span>`).join('');
@@ -64,7 +65,7 @@ async function checkDomains(index){
       registered_count:results.filter(result=>result.status==='registered').length,
       not_found_count:results.filter(result=>result.status==='not_found').length,
       unknown_count:results.filter(result=>result.status==='unknown').length,
-      entrypoint:'standalone'
+      entrypoint:entrypoint()
     });
   }catch(error){toast(error.message||'Domain status could not be checked.','bad')}
   finally{if(button){button.disabled=false;button.textContent='Check 3 domains'}}
@@ -73,7 +74,7 @@ async function initializeBrand(index){
   const item=currentNames[index];if(!item)return;
   localStorage.setItem('msbo_pending_brand_name',item.name);
   const session=loadSession();
-  trackBrandEngine('brand_engine_handoff_started',{signed_in:Boolean(session?.access_token),entrypoint:'standalone'});
+  trackBrandEngine('brand_engine_handoff_started',{signed_in:Boolean(session?.access_token),entrypoint:entrypoint()});
   if(!session?.access_token){toast('Name saved. Create or sign in to your Brand OS account to initialize it.','good');setTimeout(()=>{location.href=`/?brandEngineName=${encodeURIComponent(item.name)}`},700);return}
   try{
     const response=await fetch('/api/brands',{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${session.access_token}`},body:JSON.stringify({name:item.name})});
@@ -81,7 +82,7 @@ async function initializeBrand(index){
     if(response.status===402){toast('Your free brand slot is already used. Open Brand OS to choose what to do next.','warn');setTimeout(()=>{location.href='/'},900);return}
     if(!response.ok)throw new Error(payload.error||'Brand could not be initialized.');
     localStorage.removeItem('msbo_pending_brand_name');
-    trackBrandEngine('brand_engine_brand_initialized',{signed_in:true,entrypoint:'standalone'});
+    trackBrandEngine('brand_engine_brand_initialized',{signed_in:true,entrypoint:entrypoint()});
     toast(`${item.name} initialized in Brand OS ✓`,'good');setTimeout(()=>{location.href='/'},800);
   }catch(error){toast(error.message||'Brand could not be initialized.','bad')}
 }
@@ -95,6 +96,6 @@ document.addEventListener('click',event=>{
 
 document.addEventListener('keydown',event=>{if(event.key==='Enter'&&event.target.closest('.engineForm')){event.preventDefault();generate()}});
 
-trackBrandEngine('brand_engine_viewed',{entrypoint:'standalone'});
+trackBrandEngine('brand_engine_viewed',{entrypoint:entrypoint()});
 $('#seedWords').value='void archive motion';
 generate({track:false});
