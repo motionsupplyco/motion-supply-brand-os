@@ -5,8 +5,8 @@ import {readFile} from 'node:fs/promises';
 const server=await readFile(new URL('../server.js',import.meta.url),'utf8');
 const routes=await readFile(new URL('../lib/v2-routes.js',import.meta.url),'utf8');
 
-const indexOfOrFail=(source,needle)=>{
-  const index=source.indexOf(needle);
+const indexOfOrFail=(source,needle,start=0)=>{
+  const index=source.indexOf(needle,start);
   assert.ok(index>=0,`missing expected source marker: ${needle}`);
   return index;
 };
@@ -49,11 +49,11 @@ test('browser-facing integration list projection never selects token ciphertext 
   assert.match(block,/refresh_token_expires_at/);
 });
 
-test('public connection serializer does not expose encrypted credentials',()=>{
+test('public connection serializer exposes expiry metadata but never credentials',()=>{
   const start=indexOfOrFail(routes,'function publicConnection(row)');
   const end=indexOfOrFail(routes,'async function loadShopifyConnection',start);
   const block=routes.slice(start,end);
-  assert.doesNotMatch(block,/ciphertext|accessToken|refreshToken/);
+  assert.doesNotMatch(block,/ciphertext|accessToken\s*:|refreshToken\s*:/);
   assert.match(block,/accessTokenExpiresAt/);
   assert.match(block,/refreshTokenExpiresAt/);
 });
@@ -78,8 +78,8 @@ test('V2 integration routes remain Pro-gated where account data is exposed or mu
   ];
   for(let i=0;i<protectedRoutes.length;i++){
     const start=indexOfOrFail(routes,protectedRoutes[i]);
-    const end=i+1<protectedRoutes.length?routes.indexOf(protectedRoutes[i+1],start+1):routes.length;
-    const block=routes.slice(start,end>start?end:routes.length);
+    const end=i+1<protectedRoutes.length?indexOfOrFail(routes,protectedRoutes[i+1],start+1):routes.length;
+    const block=routes.slice(start,end);
     assert.match(block,/requireProUser\(req,res\)/,`${protectedRoutes[i]} must remain Pro-gated`);
   }
 });
