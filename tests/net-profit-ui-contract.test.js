@@ -21,7 +21,8 @@ test('Shopify source only supplies commerce observations, never invented busines
   for(const field of ['grossSales','discounts','refunds','netSales','shippingCollected'])assert.match(loadBlock,new RegExp(`model\\.${field}=`));
   for(const field of ['cogs','packagingPeriod','outboundShipping','fulfillment','paymentFees','affiliateSpend','adSpend','software','rent','payroll','contractors'])assert.doesNotMatch(loadBlock,new RegExp(`model\\.${field}=`));
   assert.match(ui,/It does not invent COGS, payroll, ad spend or fees/);
-  assert.match(ui,/operational net sales/i);
+  assert.match(ui,/Brand OS operational definition/i);
+  assert.match(ui,/not Shopify Analytics official net sales/i);
 });
 
 test('Profit Guardrails exposes true profit and both period and first-order acquisition controls',()=>{
