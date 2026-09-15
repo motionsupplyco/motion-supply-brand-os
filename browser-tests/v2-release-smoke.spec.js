@@ -20,6 +20,7 @@ test('Foundry Eight demo opens the new founder workspaces without uncaught brows
   await page.setViewportSize({width:1440,height:1100});
   await page.goto(APP,{waitUntil:'domcontentloaded'});
   await expect(page.locator('#app')).toBeVisible();
+  await expect(page.locator('#brandEngineNavLink')).toHaveAttribute('href','/brand-engine');
   await page.locator('#demoBtn').click();
   await expect(page.locator('#planPill')).toContainText(/DEMO/);
 
@@ -54,6 +55,8 @@ test('mobile sidebar utilities and custom V2 navigation close the drawer after s
   await page.locator('#menuBtn').click();
   await expect(page.locator('#side')).toHaveClass(/\bopen\b/);
   await expect(page.locator('#menuBtn')).toHaveAttribute('aria-expanded','true');
+  await expect(page.locator('#brandEngineNavLink')).toBeVisible();
+  await expect(page.locator('#brandEngineNavLink')).toHaveAttribute('href','/brand-engine');
   await page.locator('#demoBtn').click();
   await expect(page.locator('#side')).not.toHaveClass(/\bopen\b/);
   await expect(page.locator('#menuBtn')).toHaveAttribute('aria-expanded','false');
