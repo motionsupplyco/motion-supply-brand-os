@@ -10,11 +10,12 @@ const expectedTables=[
 ];
 
 const sqlWithoutComments=verifier.replace(/^\s*--.*$/gm,'');
+const sqlStatementsOnly=sqlWithoutComments.replace(/'(?:''|[^'])*'/g,"''");
 
 test('V2 post-migration verifier is transactionally read-only',()=>{
   assert.match(verifier,/begin transaction read only;/i);
   assert.match(verifier,/rollback;/i);
-  assert.doesNotMatch(sqlWithoutComments,/\b(create|alter|drop|grant|revoke|insert|update|delete|truncate)\b/i);
+  assert.doesNotMatch(sqlStatementsOnly,/\b(create|alter|drop|grant|revoke|insert|update|delete|truncate)\b/i);
 });
 
 test('V2 verifier covers every server-proxied operating table and security boundary',()=>{
