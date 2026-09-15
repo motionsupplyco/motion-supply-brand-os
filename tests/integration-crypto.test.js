@@ -31,7 +31,9 @@ test('wrong key and tampered ciphertext fail closed',()=>{
   const encrypted=encryptIntegrationSecret('refresh-token',key);
   assert.throws(()=>decryptIntegrationSecret(encrypted,otherKey));
   const parts=encrypted.split('.');
-  parts[3]=parts[3].slice(0,-1)+(parts[3].endsWith('A')?'B':'A');
+  const ciphertext=Buffer.from(parts[3],'base64url');
+  ciphertext[0]^=0x01;
+  parts[3]=ciphertext.toString('base64url');
   assert.throws(()=>decryptIntegrationSecret(parts.join('.'),key));
 });
 
