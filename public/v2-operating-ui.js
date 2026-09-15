@@ -181,6 +181,13 @@ function reorderCard(item,index,forecastHeadroom){
   const gate=reorderCashGate(result,{forecastHeadroom,depositPct:item.depositPct});
   const severity=result.severity==='critical'?'bad':result.reviewTriggered?'warn':'good';
   const statusLabel=!result.weeklyDemand?'NEEDS VELOCITY':!num(item.leadWeeks)?'ADD LEAD TIME':result.severity==='critical'?'URGENT REVIEW':result.reviewTriggered?'REVIEW':'HEALTHY';
+  const gateTone=gate.status==='fail'?'bad':'warn';
+  const gateLabel=gate.status==='unknown'?'CASH GATE NEEDS FORECAST':gate.passes?'REORDER NEEDS REVIEW':'CASH GATE FAILS';
+  const cashCopy=!num(item.landedCost)
+    ?'Add landed cost to cash-gate the reorder.'
+    :gate.status==='unknown'
+      ?`At ${num(item.depositPct)}% deposit, modeled cash due now is ${money2(gate.cashDueNow)}. Save a 13-week cash forecast before treating this reorder as cash-safe or cash-blocked.`
+      :`At ${num(item.depositPct)}% deposit, modeled cash due now is ${money2(gate.cashDueNow)} and would leave ${money2(gate.remainingHeadroom)} against the forecast's lowest headroom.`;
   return `<article class="v2ReorderCard" data-reorder-index="${index}">
     <div class="v2ReorderTop"><div><span class="kicker">${esc(item.source)} · ${esc(item.sku)}</span><h3>${esc(item.label)}</h3></div>${badge(statusLabel,severity)}</div>
     <div class="v2ReorderMetrics">
@@ -199,19 +206,21 @@ function reorderCard(item,index,forecastHeadroom){
       <label><span>Deposit %</span><input type="number" step="1" min="0" max="100" data-reorder-field="depositPct" value="${num(item.depositPct)}"></label>
       <button class="outline" data-v2-action="reorder-recalc" data-reorder-index="${index}">Recalculate</button>
     </div>
-    ${result.reviewTriggered?`<div class="v2ReorderDecision ${gate.passes?'warn':'bad'}"><b>${gate.passes?'REORDER NEEDS REVIEW':'CASH GATE FAILS'}</b><p>${esc(result.note)} ${num(item.landedCost)?`At ${num(item.depositPct)}% deposit, modeled cash due now is ${money2(gate.cashDueNow)} and would leave ${money2(gate.remainingHeadroom)} against the forecast's lowest headroom.`:'Add landed cost to cash-gate the reorder.'}</p></div>`:''}
+    ${result.reviewTriggered?`<div class="v2ReorderDecision ${gateTone}"><b>${gateLabel}</b><p>${esc(result.note)} ${cashCopy}</p></div>`:''}
   </article>`;
 }
 function renderReorderView(){
   const demo=mode().startsWith('demo'),items=demo?foundryReorderItems():inventoryToReorderItems();
-  const forecast=v2State.forecast?analysisOfForecast(v2State.forecast):null,headroom=forecast?.minimumHeadroom??0;
+  const hasCashForecast=demo||Boolean(v2State.forecastId);
+  const forecast=hasCashForecast&&v2State.forecast?analysisOfForecast(v2State.forecast):null,headroom=forecast?.minimumHeadroom??null;
   const body=!items.length?empty('No live inventory source yet','Connect Shopify to pull variant-level inventory and velocity automatically. Until then, the existing Inventory & Reorder calculator still works for manual scenarios.',`<div class="split"><button class="primary" data-v2-view="integrations">Open Integrations</button><button class="outline" data-v2-action="inventory-core">Manual inventory calculator</button></div>`):`<div class="v2Toolbar">${demo?source('FOUNDRY EIGHT · DEMO'):brandSelector('reorderBrand')}<div>${forecast?badge(`CASH FLOOR HEADROOM ${money(headroom)}`,headroom<0?'bad':'good'):badge('NO SAVED CASH FORECAST','warn')}</div></div><div class="v2ReorderStack">${items.map((item,index)=>reorderCard(item,index,headroom)).join('')}</div>`;
   return shell('OPERATING INTELLIGENCE','Reorder Intelligence','Know which size/SKU needs attention, how much stock is positioned, what the supplier will require, and whether your cash can absorb the move.',body,badge('SOURCE-AWARE','signal'));
 }
 
 function alertsFromCurrent(){
-  const forecast=v2State.forecast?analysisOfForecast(v2State.forecast):null;
-  const items=mode().startsWith('demo')?foundryReorderItems():inventoryToReorderItems();
+  const demo=mode().startsWith('demo'),hasCashForecast=demo||Boolean(v2State.forecastId);
+  const forecast=hasCashForecast&&v2State.forecast?analysisOfForecast(v2State.forecast):null;
+  const items=demo?foundryReorderItems():inventoryToReorderItems();
   const reorders=items.map(item=>({sku:item.sku,label:item.label,result:reorderIntelligence({...item,highWeeklyDemand:item.highWeeklyDemand===''?item.weeklyDemand:item.highWeeklyDemand})}));
   return buildOperatingAlerts({forecast,reorders});
 }
