@@ -52,6 +52,8 @@ jobs:
           node --check public/production-preflight-ui.js
           node --check public/factory-quote-ui.js
           node --check public/manufacturing-cash-handoff-ui.js
+          node --check public/production-milestones-ui.js
+          node --check public/production-alert-bridge-ui.js
           node --check lib/stripe-webhook-state.js
           node --check lib/integration-crypto.js
           node --check lib/integration-providers.js
