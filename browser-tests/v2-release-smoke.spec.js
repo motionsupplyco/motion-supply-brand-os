@@ -20,7 +20,7 @@ test('Foundry Eight demo opens the new founder workspaces without uncaught brows
   await page.setViewportSize({width:1440,height:1100});
   await page.goto(APP,{waitUntil:'domcontentloaded'});
   await expect(page.locator('#app')).toBeVisible();
-  await expect(page.locator('#brandEngineNavLink')).toHaveAttribute('href','/brand-engine');
+  await expect(page.locator('#brandEngineNavLink')).toHaveAttribute('href','/brand-engine?src=sidebar');
   await page.locator('#demoBtn').click();
   await expect(page.locator('#planPill')).toContainText(/DEMO/);
 
@@ -56,7 +56,7 @@ test('mobile sidebar utilities and custom V2 navigation close the drawer after s
   await expect(page.locator('#side')).toHaveClass(/\bopen\b/);
   await expect(page.locator('#menuBtn')).toHaveAttribute('aria-expanded','true');
   await expect(page.locator('#brandEngineNavLink')).toBeVisible();
-  await expect(page.locator('#brandEngineNavLink')).toHaveAttribute('href','/brand-engine');
+  await expect(page.locator('#brandEngineNavLink')).toHaveAttribute('href','/brand-engine?src=sidebar');
   await page.locator('#demoBtn').click();
   await expect(page.locator('#side')).not.toHaveClass(/\bopen\b/);
   await expect(page.locator('#menuBtn')).toHaveAttribute('aria-expanded','false');
@@ -78,8 +78,9 @@ test('mobile sidebar utilities and custom V2 navigation close the drawer after s
 });
 
 test('Brand Engine generates founder directions and labels domain evidence without fake availability claims',async({page})=>{
-  const errors=collectPageErrors(page);
+  const errors=collectPageErrors(page),events=[];
   await page.setViewportSize({width:1280,height:1000});
+  await page.route('**/api/brand-engine/event',async route=>{events.push(JSON.parse(route.request().postData()||'{}'));await route.fulfill({status:200,contentType:'application/json',body:'{"ok":true}'})});
   await page.route('**/api/brand-engine/domain-check',async route=>{
     const request=route.request();const body=JSON.parse(request.postData()||'{}');const domains=body.domains||[];
     await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({
@@ -97,16 +98,22 @@ test('Brand Engine generates founder directions and labels domain evidence witho
   await expect(page.locator('.nameCard').first().locator('.domainStatus.registered')).toHaveText('REGISTERED');
   await expect(page.locator('.nameCard').first().locator('.domainStatus.not_found')).toHaveText('NO RDAP RECORD');
   await expect(page.locator('.nameCard').first()).not.toContainText(/AVAILABLE|TRADEMARK CLEAR/i);
+  await expect.poll(()=>events.filter(event=>event.event_name==='brand_engine_names_generated').length).toBe(1);
+  await expect.poll(()=>events.filter(event=>event.event_name==='brand_engine_domain_checked').length).toBe(1);
+  const analyticsText=JSON.stringify(events);
+  expect(analyticsText).not.toMatch(/ghost archive|Ghost Dept|\.com|seed_words|brand_name|handles/i);
+  expect(events.find(event=>event.event_name==='brand_engine_viewed')?.properties?.entrypoint).toBe('standalone');
   await page.screenshot({path:`${SHOTS}/brand-engine-desktop.png`,fullPage:false});
   expect(errors,`uncaught browser errors: ${errors.join(' | ')}`).toEqual([]);
 });
 
 test('Brand Engine handoff never creates a brand until the founder explicitly presses Initialize',async({page})=>{
-  const errors=collectPageErrors(page);let brandPosts=0;
+  const errors=collectPageErrors(page),events=[];let brandPosts=0;
   await page.addInitScript(()=>{
     localStorage.setItem('msbo_pending_brand_name','Ghost Dept');
     localStorage.setItem('msbo_session',JSON.stringify({access_token:'browser-smoke-token',refresh_token:''}));
   });
+  await page.route('**/api/brand-engine/event',async route=>{events.push(JSON.parse(route.request().postData()||'{}'));await route.fulfill({status:200,contentType:'application/json',body:'{"ok":true}'})});
   await page.route('**/api/brands',async route=>{
     if(route.request().method()==='POST')brandPosts++;
     await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({brand:{id:'00000000-0000-4000-8000-000000000001',name:'Ghost Dept'}})});
@@ -120,5 +127,7 @@ test('Brand Engine handoff never creates a brand until the founder explicitly pr
   await page.locator('#brandEngineInitialize').click();
   await expect.poll(()=>brandPosts).toBe(1);
   await expect(page.locator('#brandEngineHandoffStatus')).toContainText('now saved in Brand OS');
+  await expect.poll(()=>events.filter(event=>event.event_name==='brand_engine_brand_initialized').length).toBe(1);
+  expect(JSON.stringify(events)).not.toContain('Ghost Dept');
   expect(errors,`uncaught browser errors: ${errors.join(' | ')}`).toEqual([]);
 });
