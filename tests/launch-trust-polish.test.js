@@ -29,7 +29,25 @@ test('Pro price display is centralized and covers every upgrade surface',async()
   const app=await readFile(new URL('../public/app.js',import.meta.url),'utf8');
   const account=await readFile(new URL('../public/account-ui.js',import.meta.url),'utf8');
   const memory=await readFile(new URL('../public/business-memory-ui.js',import.meta.url),'utf8');
+  const newGates=[
+    ['net-profit-ui.js','data-profit-action="upgrade"','[data-profit-action="upgrade"]'],
+    ['collection-stress-ui.js','data-stress-action="upgrade"','[data-stress-action="upgrade"]'],
+    ['production-preflight-ui.js','data-preflight-action="upgrade"','[data-preflight-action="upgrade"]'],
+    ['factory-quote-ui.js','data-quote-action="upgrade"','[data-quote-action="upgrade"]']
+  ];
+
   assert.match(polish,/PRO_PRICE_MONTHLY=19/);
-  for(const selector of ['#billingBtn','#upgradeNow','#acctBillingOpen','#memoryUpgrade'])assert.match(polish,new RegExp(selector.replace('#','\\#')));
+  assert.match(polish,/Brand OS Pro — \$\{PRO_PRICE_LABEL\} · Cancel anytime\./);
+  assert.match(polish,/querySelectorAll/,'pricing enhancer must patch every rendered matching upgrade surface');
+
+  for(const selector of ['#billingBtn','#upgradeNow','#acctBillingOpen','#memoryUpgrade','[data-v2-action="upgrade"]',...newGates.map(([, ,selector])=>selector)]){
+    assert.ok(polish.includes(selector),`launch pricing must cover ${selector}`);
+  }
+
   for(const source of [app,account,memory])assert.doesNotMatch(source,/\$19(?:\/month|\/mo)?/);
+  for(const [file,hook] of newGates){
+    const source=await readFile(new URL(`../public/${file}`,import.meta.url),'utf8');
+    assert.ok(source.includes(hook),`${file} must expose its upgrade action hook`);
+    assert.doesNotMatch(source,/\$19(?:\/month|\/mo)?/,`${file} must not duplicate the centralized Pro price`);
+  }
 });
