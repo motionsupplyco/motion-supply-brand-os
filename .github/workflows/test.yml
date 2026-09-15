@@ -19,17 +19,24 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
       - name: Install dependencies
         run: npm ci
+      - name: Verify lockfile is synchronized
+        run: |
+          npm install --package-lock-only --ignore-scripts
+          git diff --exit-code -- package-lock.json
       - name: Syntax check server
         run: node --check server.js
       - name: Syntax check app modules
         run: |
           node --check public/app.js
+          node --check public/account-ui.js
+          node --check public/business-memory-ui.js
           node --check public/math.js
           node --check public/shopify.js
           node --check public/help.js
+          node --check lib/stripe-webhook-state.js
       - name: Run tests
         run: npm test

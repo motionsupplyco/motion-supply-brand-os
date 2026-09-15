@@ -17,7 +17,7 @@ const storedTouched=safeStoredJson('msbo_touched',[]);
 let touched=new Set(Array.isArray(storedTouched)?storedTouched:[]);
 let lastImport=safeStoredJson('msbo_last_import',null);
 localStorage.setItem('msbo_version',VERSION);
-let config={authConfigured:false,cloudConfigured:false,billingConfigured:false},session=loadSession(),entitlement={plan:'free',active:false,limits:{brands:1,skus:5},usage:{brands:0,skus:0}};
+let config={authConfigured:false,cloudConfigured:false,billingConfigured:false},session=loadSession(),entitlement={plan:'free',active:false,billingManageable:false,limits:{brands:1,skus:5},usage:{brands:0,skus:0}};
 let current='dashboard',brands=[],skus=[];
 const $=s=>document.querySelector(s); const money=n=>new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(Number.isFinite(+n)?+n:0); const pct=n=>`${(+n||0).toFixed(1)}%`;
 const save=()=>{localStorage.setItem('msbo_state',JSON.stringify(state));localStorage.setItem('msbo_mode',mode);localStorage.setItem('msbo_version',VERSION);localStorage.setItem('msbo_touched',JSON.stringify([...touched]));if(lastImport)localStorage.setItem('msbo_last_import',JSON.stringify(lastImport));else localStorage.removeItem('msbo_last_import')};
@@ -40,19 +40,19 @@ const readyFunnel=()=>hasInput('sessions')&&state.sessions>0&&hasInput('orders')
 const missingOrderCosts=()=>['packaging','shippingSubsidy','returnReserve','processorPercent','processorFixed'].filter(k=>!hasInput(k));
 function loadSession(){try{return JSON.parse(localStorage.getItem('msbo_session')||'null')}catch{return null}}
 function storeSession(s){session=s||null;if(session)localStorage.setItem('msbo_session',JSON.stringify(session));else localStorage.removeItem('msbo_session')}
-async function api(url,method='GET',body,withAuth=false){
+async function api(url,method='GET',body,withAuth=false,signal=null){
   const headers={'Content-Type':'application/json'};if(withAuth&&session?.access_token)headers.Authorization=`Bearer ${session.access_token}`;
   let r;
-  try{r=await fetch(url,{method,headers,body:body?JSON.stringify(body):undefined})}catch{throw new Error('Brand OS could not reach its server. Refresh the page and check the deployment status.')}
+  try{r=await fetch(url,{method,headers,body:body?JSON.stringify(body):undefined,signal})}catch(e){if(e?.name==='AbortError')throw e;throw new Error('Brand OS could not reach its server. Refresh the page and check the deployment status.')}
   if(r.status===401&&withAuth&&session?.refresh_token){
     let rr;try{rr=await fetch('/api/auth/refresh',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({refresh_token:session.refresh_token})})}catch{throw new Error('Could not refresh your session.')}
-    if(rr.ok){const j=await rr.json();storeSession(j.session);headers.Authorization=`Bearer ${session.access_token}`;r=await fetch(url,{method,headers,body:body?JSON.stringify(body):undefined})}
+    if(rr.ok){const j=await rr.json();storeSession(j.session);headers.Authorization=`Bearer ${session.access_token}`;r=await fetch(url,{method,headers,body:body?JSON.stringify(body):undefined,signal})}
   }
-  const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||`Request failed (${r.status})`);return j
+  const j=await r.json().catch(()=>({}));if(!r.ok){const e=new Error(j.error||`Request failed (${r.status})`);e.status=r.status;e.code=j.code||null;throw e}return j
 }
 async function init(){config=await fetch('/api/public-config').then(r=>r.json()).catch(()=>config);await refreshAccount();track('landing_page_viewed');render()}
-async function refreshAccount(){if(!session){entitlement={plan:config.authConfigured?'free':'local',active:false,limits:{brands:1,skus:5},usage:{brands:0,skus:0}};brands=[];skus=[];updateAccount();return}try{const acct=await api('/api/account','GET',null,true);entitlement={plan:acct.plan,active:acct.active,limits:acct.limits||{brands:1,skus:5},usage:acct.usage||{brands:0,skus:0}};await loadCloud()}catch(e){storeSession(null);brands=[];skus=[];entitlement={plan:'free',active:false,limits:{brands:1,skus:5},usage:{brands:0,skus:0}}}updateAccount()}
-function updateAccount(){if(!$('#planPill'))return;$('#planPill').textContent=session?entitlement.plan.toUpperCase():(mode==='demo'?'DEMO':mode==='demo-edited'?'DEMO*':'LOCAL');$('#authBtn').textContent=session?'Account':'Sign in';$('#billingBtn').classList.toggle('hidden',!session||!config.billingConfigured);$('#billingBtn').textContent=entitlement.active?'Billing':'Upgrade'}
+async function refreshAccount(){if(!session){entitlement={plan:config.authConfigured?'free':'local',active:false,billingManageable:false,limits:{brands:1,skus:5},usage:{brands:0,skus:0}};brands=[];skus=[];updateAccount();return}let acct;try{acct=await api('/api/account','GET',null,true)}catch(e){if(e.status===401){storeSession(null);brands=[];skus=[];entitlement={plan:'free',active:false,billingManageable:false,limits:{brands:1,skus:5},usage:{brands:0,skus:0}}}else console.error('refresh-account',e);updateAccount();return}entitlement={plan:acct.plan,active:acct.active,billingManageable:Boolean(acct.billingManageable),limits:acct.limits||{brands:1,skus:5},usage:acct.usage||{brands:0,skus:0}};try{await loadCloud()}catch(e){console.error('load-cloud',e)}updateAccount()}
+function updateAccount(){if(!$('#planPill'))return;$('#planPill').textContent=session?entitlement.plan.toUpperCase():(mode==='demo'?'DEMO':mode==='demo-edited'?'DEMO*':'LOCAL');$('#authBtn').textContent=session?'Account':'Sign in';$('#billingBtn').classList.toggle('hidden',!session||!config.billingConfigured);$('#billingBtn').textContent=(entitlement.active||entitlement.billingManageable)?'Billing':'Upgrade'}
 async function loadCloud(){const [b,s]=await Promise.all([api('/api/brands','GET',null,true),api('/api/skus','GET',null,true)]);brands=b.brands||[];skus=s.skus||[]}
 
 
@@ -278,7 +278,7 @@ function renderImport(x,compact=false){
   const date=x.startDate||x.endDate?`<div class="mini importRange">Export range: ${escapeHtml(x.startDate||'—')} → ${escapeHtml(x.endDate||'—')}</div>`:'';
   return `${date}<div class="grid g4 mt">${metric('Orders in export',x.orderCount,'Unique order names')}${metric('Non-canceled order total',money(x.nonCanceledOrderTotal ?? x.csvOrderTotal),'Order Total field, excluding rows marked canceled')}${metric('Units in line items',x.units,'Line-item quantities')}${metric('Avg exported order total',money(x.averageOrderTotal),'CSV order total ÷ all exported orders')}</div>${compact?'':`<div class="grid g3 mt">${metric('Canceled orders',x.canceledOrders ?? 0)}${metric('Discount amount',money(x.csvDiscountAmount),'Exported order-level discount field')}${metric('Unique customer emails',x.uniqueCustomerEmails)}</div><div class="warning mt"><b>Not Shopify Analytics net sales.</b>This Orders CSV snapshot is an operational export. Returns and sales reversals can differ from Shopify Analytics. Use Transaction history for captured/refunded payment cash and Shopify Analytics for official net-sales reporting.</div><div class="table mt"><table><thead><tr><th>Top SKU / item</th><th>Units</th><th>Line-item value</th></tr></thead><tbody>${x.topSkus.map(s=>`<tr><td>${escapeHtml(s.sku)}</td><td>${s.units}</td><td>${money(s.value)}</td></tr>`).join('')}</tbody></table></div>`}`
 }
-function brandsView(){if(!session)return `${head('Brands & SKUs','Cloud saving needs an account. Calculators still work locally.','Secure cloud storage')}<div class="card"><p>Sign in to save brands and SKUs. Account traffic is proxied through the Brand OS server so the browser does not depend on a third-party CDN connection.</p><button class="primary" id="inlineSignIn">Sign in</button></div>`;const brandLimit=entitlement.limits?.brands,skuLimit=entitlement.limits?.skus,brandMaxed=!isPro()&&Number.isFinite(brandLimit)&&brands.length>=brandLimit,skuMaxed=!isPro()&&Number.isFinite(skuLimit)&&skus.length>=skuLimit;return `${head('Brands & SKUs','Save basic product economics under your account.','Owner-scoped cloud rows')}<div class="card"><div class="mini">${isPro()?'Pro: unlimited saved brands and SKUs.':`Free: ${brands.length}/${brandLimit??1} brand and ${skus.length}/${skuLimit??5} SKUs saved.`}</div>${brandMaxed?`<div class="advice mt"><b>Free brand limit reached.</b>Upgrade to Pro for unlimited brands and SKUs.</div>`:`<div class="split mt"><input id="brandName" placeholder="Brand name" style="flex:1;padding:11px;border:1px solid #ccc;border-radius:8px"><button id="addBrand" class="primary">Add brand</button></div>`}</div><div class="grid g2 mt">${brands.map(b=>`<div class="card"><div class="skuBar"><div><b>${escapeHtml(b.name)}</b><div class="mini">${escapeHtml(b.currency)}</div></div></div><hr style="border:0;border-top:1px solid #eee"><div class="mini">${skus.filter(s=>s.brand_id===b.id).length} saved SKUs</div>${skuMaxed?`<div class="mini mt">Free SKU limit reached.</div>`:`<div class="split" style="margin-top:10px"><input id="sku-${b.id}" placeholder="SKU" style="width:90px;padding:8px"><input id="name-${b.id}" placeholder="Product" style="flex:1;padding:8px"><input id="price-${b.id}" type="number" min="0" step=".01" placeholder="Retail $" style="width:110px;padding:8px"><button data-addsku="${b.id}" class="outline">Add</button></div>`}${skus.filter(s=>s.brand_id===b.id).map(s=>`<div class="row"><span>${escapeHtml(s.sku)} · ${escapeHtml(s.name)}</span><b>${money(s.retail_price)}</b></div>`).join('')}</div>`).join('')||'<div class="card">No brands yet.</div>'}</div>`}
+function brandsView(){if(!session)return `${head('Brands & SKUs','Cloud saving needs an account. Calculators still work locally.','Secure cloud storage')}<div class="card"><p>Sign in to save brands and SKUs. Account traffic is proxied through the Brand OS server so the browser does not depend on a third-party CDN connection.</p><button class="primary" id="inlineSignIn">Sign in</button></div>`;const brandLimit=entitlement.limits?.brands,skuLimit=entitlement.limits?.skus,brandMaxed=!isPro()&&Number.isFinite(brandLimit)&&brands.length>=brandLimit,skuMaxed=!isPro()&&Number.isFinite(skuLimit)&&skus.length>=skuLimit;return `${head('Brands & SKUs','Save basic product economics under your account.','Owner-scoped cloud rows')}<div class="card"><div class="mini">${isPro()?'Pro: unlimited saved brands and SKUs.':`Free: ${brands.length}/${brandLimit??1} brand and ${skus.length}/${skuLimit??5} SKUs saved.`}</div>${brandMaxed?`<div class="advice mt"><b>Free brand limit reached.</b>Upgrade to Pro for unlimited brands and SKUs.</div>`:`<div class="split mt"><input id="brandName" placeholder="Brand name" style="flex:1;padding:11px;border:1px solid #ccc;border-radius:8px"><button id="addBrand" class="primary">Add brand</button></div>`}</div><div class="grid g2 mt">${brands.map(b=>`<div class="card"><div class="skuBar"><div><b>${escapeHtml(b.name)}</b><div class="mini">${escapeHtml(b.currency)}</div></div><div class="split"><button class="ghost" data-editbrand="${b.id}" type="button">Rename</button><button class="ghost" data-deletebrand="${b.id}" type="button">Delete brand</button></div></div><hr style="border:0;border-top:1px solid #eee"><div class="mini">${skus.filter(s=>s.brand_id===b.id).length} saved SKUs</div>${skuMaxed?`<div class="mini mt">Free SKU limit reached.</div>`:`<div class="split" style="margin-top:10px"><input id="sku-${b.id}" placeholder="SKU" style="width:90px;padding:8px"><input id="name-${b.id}" placeholder="Product" style="flex:1;padding:8px"><input id="price-${b.id}" type="number" min="0" step=".01" placeholder="Retail $" style="width:110px;padding:8px"><button data-addsku="${b.id}" class="outline">Add</button></div>`}${skus.filter(s=>s.brand_id===b.id).map(s=>`<div class="row"><span>${escapeHtml(s.sku)} · ${escapeHtml(s.name)}</span><div class="split"><b>${money(s.retail_price)}</b><button class="ghost" data-editsku="${s.id}" type="button">Edit</button><button class="ghost" data-deletesku="${s.id}" type="button">Delete</button></div></div>`).join('')}</div>`).join('')||'<div class="card">No brands yet.</div>'}</div>`}
 
 
 async function addBrand(){
@@ -296,6 +296,43 @@ async function addBrand(){
   }catch(e){
     if(btn){btn.disabled=false;btn.textContent='Add brand'}
     alert(e.message)
+  }
+}
+
+async function editBrand(brandId){
+  const brand=brands.find(b=>String(b.id)===String(brandId));
+  if(!brand)return;
+  const value=prompt('Rename brand',brand.name);
+  if(value===null)return;
+  const name=value.trim();
+  if(!name){alert('Brand name is required.');return}
+  if(brands.some(b=>String(b.id)!==String(brandId)&&String(b.name||'').trim().toLowerCase()===name.toLowerCase())){alert('That brand already exists in your account.');return}
+  try{await api(`/api/brands/${encodeURIComponent(brandId)}`,'PATCH',{name},true);await loadCloud();render()}catch(e){alert(e.message)}
+}
+
+async function deleteBrand(brandId){
+  closeMenu({restoreFocus:false});
+  const brand=brands.find(b=>String(b.id)===String(brandId));
+  if(!brand)return;
+  const skuCount=skus.filter(s=>String(s.brand_id)===String(brandId)).length;
+  const warning=skuCount?`Delete ${brand.name} and its ${skuCount} saved SKU${skuCount===1?'':'s'}? This cannot be undone.`:`Delete ${brand.name}? This cannot be undone.`;
+  if(!confirm(warning))return;
+  const btn=document.querySelector(`[data-deletebrand="${CSS.escape(String(brandId))}"]`);
+  if(btn?.disabled)return;
+  const oldText=btn?.textContent||'Delete brand';
+  if(btn){btn.disabled=true;btn.textContent='Deleting…'}
+  const controller=new AbortController();
+  const timer=setTimeout(()=>controller.abort(),15000);
+  try{
+    await api(`/api/brands/${encodeURIComponent(brandId)}`,'DELETE',null,true,controller.signal);
+    await refreshAccount();
+    render();
+  }catch(e){
+    const message=e?.name==='AbortError'?'Delete request timed out. Refresh before trying again; the server may have completed the request.':e.message;
+    alert(message);
+  }finally{
+    clearTimeout(timer);
+    if(btn?.isConnected){btn.disabled=false;btn.textContent=oldText}
   }
 }
 
@@ -318,6 +355,25 @@ async function addSku(brandId){
     if(btn){btn.disabled=false;btn.textContent='Add'}
     alert(e.message)
   }
+}
+
+async function editSku(skuId){
+  const item=skus.find(s=>String(s.id)===String(skuId));
+  if(!item)return;
+  const sku=prompt('SKU code',item.sku);if(sku===null)return;
+  const name=prompt('Product name',item.name);if(name===null)return;
+  const priceRaw=prompt('Retail price',String(item.retail_price));if(priceRaw===null)return;
+  const retail_price=Number(priceRaw);
+  if(!sku.trim()||!name.trim()){alert('SKU and product name are required.');return}
+  if(!Number.isFinite(retail_price)||retail_price<0){alert('Enter a valid retail price.');return}
+  if(skus.some(s=>String(s.id)!==String(skuId)&&String(s.brand_id)===String(item.brand_id)&&String(s.sku||'').trim().toLowerCase()===sku.trim().toLowerCase())){alert('That SKU already exists under this brand.');return}
+  try{await api(`/api/skus/${encodeURIComponent(skuId)}`,'PATCH',{sku:sku.trim(),name:name.trim(),retail_price},true);await loadCloud();render()}catch(e){alert(e.message)}
+}
+
+async function deleteSku(skuId){
+  const item=skus.find(s=>String(s.id)===String(skuId));
+  if(!item||!confirm(`Delete ${item.sku} · ${item.name}? This cannot be undone.`))return;
+  try{await api(`/api/skus/${encodeURIComponent(skuId)}`,'DELETE',null,true);await refreshAccount();render()}catch(e){alert(e.message)}
 }
 
 
@@ -356,10 +412,18 @@ function bind(){
   const f=$('#csvFile');if(f)f.onchange=handleCsv;
   const c=$('#clearImport');if(c)c.onclick=()=>{lastImport=null;save();render()};
   const s=$('#inlineSignIn');if(s)s.onclick=showAuth;
+  document.querySelectorAll('[data-editbrand]').forEach(el=>el.onclick=()=>editBrand(el.dataset.editbrand));
+  document.querySelectorAll('[data-deletebrand]').forEach(el=>el.onclick=()=>deleteBrand(el.dataset.deletebrand));
   const ab=$('#addBrand');if(ab)ab.onclick=addBrand;const up=$('#upgradeNow');if(up)up.onclick=upgradeFlow;
-  document.querySelectorAll('[data-addsku]').forEach(b=>b.onclick=()=>addSku(b.dataset.addsku))
+  document.querySelectorAll('[data-addsku]').forEach(b=>b.onclick=()=>addSku(b.dataset.addsku));
+  document.querySelectorAll('[data-editsku]').forEach(b=>b.onclick=()=>editSku(b.dataset.editsku));
+  document.querySelectorAll('[data-deletesku]').forEach(b=>b.onclick=()=>deleteSku(b.dataset.deletesku))
 }
-function jumpTo(view){track('tool_opened',{view});if(isProLocked(view)){const k=`pro_page_viewed_${view}`;if(!tracked[k]){tracked[k]=true;localStorage.setItem('msbo_tracked_events',JSON.stringify(tracked));track('pro_page_viewed',{view})}}current=view;document.querySelectorAll('#nav button').forEach(x=>x.classList.toggle('active',x.dataset.view===view));$('#side')?.classList.remove('open');render();scrollTo(0,0)}
+function closeMenu({restoreFocus=true}={}){const side=$('#side'),trigger=$('#menuBtn'),wasOpen=Boolean(side?.classList.contains('open')||document.body.classList.contains('menuOpen'));side?.classList.remove('open');document.body.classList.remove('menuOpen');trigger?.setAttribute('aria-expanded','false');if(wasOpen&&restoreFocus)requestAnimationFrame(()=>trigger?.focus())}
+function openMenu(){const side=$('#side'),trigger=$('#menuBtn');side?.classList.add('open');document.body.classList.add('menuOpen');trigger?.setAttribute('aria-expanded','true');requestAnimationFrame(()=>($('#menuCloseBtn')||document.querySelector('#nav button'))?.focus())}
+function toggleMenu(){if($('#side')?.classList.contains('open'))closeMenu();else openMenu()}
+window.msboCloseMenu=closeMenu;
+function jumpTo(view){track('tool_opened',{view});if(isProLocked(view)){const k=`pro_page_viewed_${view}`;if(!tracked[k]){tracked[k]=true;localStorage.setItem('msbo_tracked_events',JSON.stringify(tracked));track('pro_page_viewed',{view})}}current=view;document.querySelectorAll('#nav button').forEach(x=>x.classList.toggle('active',x.dataset.view===view));closeMenu();render();scrollTo(0,0)}
 async function handleCsv(e){
   const file=e.target.files[0];if(!file)return;
   if(session&&!entitlement.active&&config.billingConfigured){alert('Shopify CSV dashboard is a Pro feature for signed-in users.');return}
@@ -370,11 +434,11 @@ async function handleCsv(e){
     if(session)await api('/api/import-summaries','POST',{file_kind:lastImport.kind,start_date:lastImport.startDate||null,end_date:lastImport.endDate||null,summary:lastImport},true)
   }catch(err){alert(err.message)}
 }
-function showAuth(){if(!config.authConfigured)return alert('Account service is not fully configured on this deployment yet.');if(session)return showAccount();showModal(`<h2>Sign in / create account</h2><div class="authform"><input id="email" type="email" placeholder="Email"><input id="password" type="password" placeholder="Password (6+ characters)"><div id="authMsg" class="mini"></div><div class="split"><button id="signin" class="primary">Sign in</button><button id="signup" class="outline">Create account</button></div></div>`);$('#signin').onclick=()=>auth('signin');$('#signup').onclick=()=>auth('signup')}
+function showAuth(){if(!config.authConfigured)return alert('Account service is not fully configured on this deployment yet.');if(session)return showAccount();showModal(`<h2>Sign in / create account</h2><div class="authform"><input id="email" type="email" placeholder="Email"><input id="password" type="password" placeholder="Password (8+ characters)"><div id="authMsg" class="mini"></div><div class="split"><button id="signin" class="primary">Sign in</button><button id="signup" class="outline">Create account</button></div></div>`);$('#signin').onclick=()=>auth('signin');$('#signup').onclick=()=>auth('signup')}
 async function auth(kind){if(kind==='signup')track('signup_started');const email=$('#email').value.trim(),password=$('#password').value,msg=$('#authMsg');msg.textContent='Working…';try{const x=await api(`/api/auth/${kind}`,'POST',{email,password});if(x.confirmationRequired){msg.textContent='Account created. Check your email to confirm, then sign in.';return}storeSession(x.session);if(kind==='signup')track('signup_completed');hideModal();await refreshAccount();render()}catch(e){msg.textContent=e.message}}
-function showAccount(){showModal(`<h2>Account</h2><p>${escapeHtml(session?.user?.email||'Signed in')}</p><p>Plan: <b>${entitlement.plan.toUpperCase()}</b></p><div class="split"><button id="signout" class="outline">Sign out</button>${config.billingConfigured?`<button id="acctBilling" class="primary">${entitlement.active?'Manage billing':'Upgrade to Pro'}</button>`:''}</div>`);$('#signout').onclick=()=>{storeSession(null);brands=[];skus=[];hideModal();refreshAccount();render()};const b=$('#acctBilling');if(b)b.onclick=startBilling}
-async function startBilling(){try{if(!entitlement.active)track('checkout_started');const endpoint=entitlement.active?'/api/create-portal-session':'/api/create-checkout-session';const x=await api(endpoint,'POST',{},true);location.href=x.url}catch(e){alert(e.message)}}
-function showModal(html){$('#modalBody').innerHTML=html;$('#modal').classList.remove('hidden')}function hideModal(){$('#modal').classList.add('hidden')}
+function showAccount(){showModal(`<h2>Account</h2><p>${escapeHtml(session?.user?.email||'Signed in')}</p><p>Plan: <b>${entitlement.plan.toUpperCase()}</b></p><div class="split"><button id="signout" class="outline">Sign out</button>${config.billingConfigured?`<button id="acctBilling" class="primary">${(entitlement.active||entitlement.billingManageable)?'Manage billing':'Upgrade to Pro'}</button>`:''}</div>`);$('#signout').onclick=()=>{storeSession(null);brands=[];skus=[];hideModal();refreshAccount();render()};const b=$('#acctBilling');if(b)b.onclick=startBilling}
+async function startBilling(){try{const manage=Boolean(entitlement.active||entitlement.billingManageable);if(!manage)track('checkout_started');const endpoint=manage?'/api/create-portal-session':'/api/create-checkout-session';const x=await api(endpoint,'POST',{},true);location.href=x.url}catch(e){alert(e.message)}}
+function showModal(html){closeMenu({restoreFocus:false});$('#modalBody').innerHTML=html;$('#modal').classList.remove('hidden')}function hideModal(){$('#modal').classList.add('hidden')}
 function loadFoundryDemo(){
   state=clone(FOUNDRY_EIGHT);
   mode='demo';
@@ -404,7 +468,8 @@ function startFreshModel(){
 document.addEventListener('click',e=>{
   const navBtn=e.target.closest('#nav button[data-view]');
   if(navBtn){jumpTo(navBtn.dataset.view);return}
-  if(e.target.closest('#menuBtn')){$('#side')?.classList.toggle('open');return}
+  if(e.target.closest('#menuBtn')){toggleMenu();return}
+  if(e.target.closest('#menuCloseBtn')||e.target.closest('#menuBackdrop')){closeMenu();return}
   if(e.target.closest('#demoBtn')){e.preventDefault();loadFoundryDemo();return}
   if(e.target.closest('#freshBtn')){e.preventDefault();startFreshModel();return}
   if(e.target.closest('#authBtn')){showAuth();return}
@@ -412,5 +477,6 @@ document.addEventListener('click',e=>{
   if(e.target.closest('#closeModal')){hideModal();return}
   if(e.target.id==='modal'){hideModal();return}
 });
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){if(!$('#modal')?.classList.contains('hidden'))hideModal();closeMenu()}});
 
 init();

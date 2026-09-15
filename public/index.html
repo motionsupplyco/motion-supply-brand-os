@@ -10,16 +10,20 @@
 </head>
 <body>
 <div class="shell">
-  <aside class="side" id="side">
-    <div class="brand">
-      <div class="mark">MS</div>
-      <div class="brandcopy"><b>MOTION SUPPLY</b><small>BRAND OS</small></div>
+  <aside class="side" id="side" aria-label="Main navigation">
+    <div class="sideTop">
+      <div class="brand">
+        <div class="mark">MS</div>
+        <div class="brandcopy"><b>MOTION SUPPLY</b><small>BRAND OS</small></div>
+      </div>
+      <button id="menuCloseBtn" class="menuClose" type="button" aria-label="Close navigation">×</button>
     </div>
     <div class="navlabel">OPERATE</div>
     <nav id="nav">
       <div class="navgroup">Command Center</div>
       <button class="active" data-view="dashboard"><span>▦</span>Business Health</button>
       <button data-view="advisor"><span>→</span>Next Move</button>
+      <button id="memoryNav"><span>◈</span>Business Memory</button>
 
       <div class="navgroup">Make Money</div>
       <button data-view="profit"><span>↗</span>Profit & Pricing</button>
@@ -48,10 +52,11 @@
       <button id="freshBtn" class="ghost subtle">Start fresh</button>
     </div>
   </aside>
+  <button id="menuBackdrop" class="menuBackdrop" type="button" aria-label="Close navigation"></button>
   <main>
     <header>
       <div class="headleft">
-        <button id="menuBtn" class="menu" aria-label="Open navigation">☰</button>
+        <button id="menuBtn" class="menu" aria-label="Open navigation" aria-controls="side" aria-expanded="false">☰</button>
         <div>
           <span class="eyebrow">MOTION SUPPLY CO.</span>
           <h1 id="title">Business Health</h1>
@@ -66,8 +71,12 @@
     <section id="app" class="view"></section>
   </main>
 </div>
-<div id="modal" class="modal hidden"><div class="modalbox"><button id="closeModal" class="close">×</button><div id="modalBody"></div></div></div>
+<div id="modal" class="modal hidden"><div class="modalbox" role="dialog" aria-modal="true" aria-label="Brand OS dialog" tabindex="-1"><button id="closeModal" class="close" type="button" aria-label="Close dialog">×</button><div id="modalBody"></div></div></div>
+<script type="module" src="account-ui.js"></script>
+<script type="module" src="business-memory-ui.js"></script>
 <script type="module" src="app.js"></script>
+<script type="module" src="mobile-nav-a11y.js"></script>
+<script type="module" src="modal-a11y.js"></script>
 <script type="module" src="help.js"></script>
 </body>
 </html>
