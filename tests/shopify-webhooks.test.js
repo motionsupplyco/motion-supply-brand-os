@@ -1,0 +1,41 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
+import {SHOPIFY_WEBHOOK_TOPICS,SHOPIFY_WEBHOOK_LIST_QUERY,SHOPIFY_WEBHOOK_CREATE_MUTATION,verifyShopifyWebhookHmac,ensureShopifyWebhooks} from '../lib/shopify-webhooks.js';
+
+test('Shopify webhook verifier authenticates the raw body with base64 HMAC',()=>{
+  const body=Buffer.from('{"id":123,"topic":"orders/create"}');
+  const secret='shopify-client-secret';
+  const hmac=crypto.createHmac('sha256',secret).update(body).digest('base64');
+  assert.equal(verifyShopifyWebhookHmac(body,hmac,secret),true);
+  assert.equal(verifyShopifyWebhookHmac(Buffer.from('{}'),hmac,secret),false);
+  assert.equal(verifyShopifyWebhookHmac(body,'not-a-valid-signature',secret),false);
+});
+
+test('webhook registration only creates missing topic+URI pairs',async()=>{
+  const calls=[];
+  const uri='https://www.motionsupplyos.com/api/integrations/shopify/webhook';
+  const graphql=async(query,variables)=>{
+    calls.push({query,variables});
+    if(query===SHOPIFY_WEBHOOK_LIST_QUERY)return {webhookSubscriptions:{nodes:[{id:'w1',topic:'APP_UNINSTALLED',uri}]}};
+    if(query===SHOPIFY_WEBHOOK_CREATE_MUTATION)return {webhookSubscriptionCreate:{webhookSubscription:{id:`new-${variables.topic}`,topic:variables.topic,uri:variables.webhookSubscription.uri},userErrors:[]}};
+    throw new Error('unexpected query');
+  };
+  const result=await ensureShopifyWebhooks({graphql,appUrl:'https://www.motionsupplyos.com'});
+  assert.equal(result.uri,uri);
+  assert.equal(result.created.length,SHOPIFY_WEBHOOK_TOPICS.length-1);
+  assert.equal(calls.filter(call=>call.query===SHOPIFY_WEBHOOK_CREATE_MUTATION).some(call=>call.variables.topic==='APP_UNINSTALLED'),false);
+  assert.ok(result.created.some(item=>item.topic==='ORDERS_CREATE'));
+  assert.ok(result.created.some(item=>item.topic==='INVENTORY_LEVELS_UPDATE'));
+});
+
+test('webhook registration surfaces provider userErrors instead of claiming success',async()=>{
+  const graphql=async(query,variables)=>{
+    if(query===SHOPIFY_WEBHOOK_LIST_QUERY)return {webhookSubscriptions:{nodes:[]}};
+    return {webhookSubscriptionCreate:{webhookSubscription:null,userErrors:variables.topic==='ORDERS_CREATE'?[{field:['topic'],message:'denied'}]:[]}};
+  };
+  const result=await ensureShopifyWebhooks({graphql,appUrl:'https://www.motionsupplyos.com',topics:['ORDERS_CREATE']});
+  assert.equal(result.created.length,0);
+  assert.equal(result.errors.length,1);
+  assert.equal(result.errors[0].topic,'ORDERS_CREATE');
+});
