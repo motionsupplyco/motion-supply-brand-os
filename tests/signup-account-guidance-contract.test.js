@@ -14,10 +14,8 @@ test('ambiguous signup confirmation stays privacy-safe without duplicate-account
   assert.match(account,/check Spam or Promotions too/);
 });
 
-test('post-signup guidance exposes sign-in and password-recovery paths',()=>{
-  assert.match(account,/id="acctAfterSignupSignin"/);
-  assert.match(account,/id="acctAfterSignupRecover"/);
-  assert.match(account,/acctAfterSignupSignin/);
-  assert.match(account,/acctAfterSignupRecover/);
-  assert.match(account,/showForgotPassword/);
+test('post-signup confirmation does not show account-recovery actions',()=>{
+  assert.doesNotMatch(account,/id="acctAfterSignupSignin"/);
+  assert.doesNotMatch(account,/id="acctAfterSignupRecover"/);
+  assert.doesNotMatch(account,/No email after a few minutes\?/);
 });
