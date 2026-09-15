@@ -21,13 +21,13 @@ test('sitemap and robots expose the canonical Brand Engine route',()=>{
   assert.match(robots,/Sitemap: https:\/\/www\.motionsupplyos\.com\/sitemap\.xml/);
 });
 
-test('Brand OS sidebar utility area exposes the free Brand Engine',()=>{
+test('Brand OS sidebar utility area exposes the free Brand Engine with source attribution',()=>{
   assert.match(handoff,/id='brandEngineNavLink'/);
-  assert.match(handoff,/link\.href='\/brand-engine'/);
+  assert.match(handoff,/link\.href='\/brand-engine\?src=sidebar'/);
   assert.match(handoff,/Brand Engine · Free name tool/);
 });
 
 test('Brand Engine public routes are mounted without modifying server route order',()=>{
-  assert.match(planningRoutes,/registerBrandEngineRoutes\(app\)/);
+  assert.match(planningRoutes,/registerBrandEngineRoutes\(app,\{admin\}\)/);
   assert.match(planningRoutes,/import \{registerBrandEngineRoutes\} from '\.\/brand-engine-routes\.js'/);
 });
