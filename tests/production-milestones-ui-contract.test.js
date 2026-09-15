@@ -33,6 +33,17 @@ test('actual completion inputs cannot select future dates',()=>{
   assert.match(ui,/CHECK ACTUAL DATE/);
 });
 
+test('Production Tracker guards MutationObserver rerenders with a stable signature',()=>{
+  assert.match(ui,/function trackerSignature\(/);
+  assert.match(ui,/const signature=trackerSignature\(\{today,timeline,actuals\}\)/);
+  assert.match(ui,/if\(panel\.dataset\.renderSignature===signature\)return/);
+  assert.match(ui,/panel\.dataset\.renderSignature=signature/);
+  assert.match(ui,/new MutationObserver\(\(\)=>queueMicrotask\(renderTracker\)\)/);
+  const guard=ui.indexOf('if(panel.dataset.renderSignature===signature)return');
+  const write=ui.indexOf('panel.innerHTML=');
+  assert.ok(guard>-1&&write>-1&&guard<write,'render signature must be checked before tracker DOM is rewritten');
+});
+
 test('Production Tracker exposes mobile layout',()=>{
   assert.match(css,/@media\(max-width:560px\)/);
 });
