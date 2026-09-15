@@ -39,6 +39,23 @@ test('V2 cash forecast keeps all 13-week operating categories visible',()=>{
   for(const label of ['DTC payouts','Wholesale','Factory deposit','Factory balance','Freight / duty','Marketing','Payroll / contractors','Software / rent','Taxes / debt','Other outflows'])assert.match(ui,new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'i'));
 });
 
+test('Reorder Intelligence never turns a missing saved forecast into zero cash headroom',()=>{
+  assert.match(ui,/const hasCashForecast=demo\|\|Boolean\(v2State\.forecastId\)/);
+  assert.match(ui,/headroom=forecast\?\.minimumHeadroom\?\?null/);
+  assert.doesNotMatch(ui,/headroom=forecast\?\.minimumHeadroom\?\?0/);
+  assert.match(ui,/CASH GATE NEEDS FORECAST/);
+  assert.match(ui,/Save a 13-week cash forecast before treating this reorder as cash-safe or cash-blocked/i);
+});
+
+test('Operating Alerts do not treat an unsaved blank forecast as cash evidence',()=>{
+  const start=ui.indexOf('function alertsFromCurrent()');
+  const end=ui.indexOf('function renderAlerts()',start);
+  assert.ok(start>=0&&end>start,'alertsFromCurrent must exist');
+  const block=ui.slice(start,end);
+  assert.match(block,/hasCashForecast=demo\|\|Boolean\(v2State\.forecastId\)/);
+  assert.match(block,/hasCashForecast&&v2State\.forecast\?analysisOfForecast/);
+});
+
 test('V2 responsive CSS includes desktop, tablet and narrow-phone adaptations',()=>{
   assert.match(css,/@media\(max-width:1050px\)/);
   assert.match(css,/@media\(max-width:720px\)/);
