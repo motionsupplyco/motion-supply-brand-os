@@ -4,10 +4,14 @@ import {readFile} from 'node:fs/promises';
 
 const account=await readFile(new URL('../public/account-ui.js',import.meta.url),'utf8');
 
-test('ambiguous signup confirmation does not falsely claim a new account was created',()=>{
+test('ambiguous signup confirmation stays privacy-safe without duplicate-account copy',()=>{
   assert.doesNotMatch(account,/Account created\. Check your email to confirm, then sign in\./);
-  assert.match(account,/If this is a new account, check your email for the confirmation message\./);
-  assert.match(account,/If you already used this email before, sign in or reset your password\./);
+  assert.doesNotMatch(account,/We sent a confirmation link/);
+  assert.doesNotMatch(account,/Already used this email before\?/);
+  assert.doesNotMatch(account,/Supabase intentionally does not reveal/);
+  assert.match(account,/Check your email/);
+  assert.match(account,/Look for a confirmation link at/);
+  assert.match(account,/check Spam or Promotions too/);
 });
 
 test('post-signup guidance exposes sign-in and password-recovery paths',()=>{
