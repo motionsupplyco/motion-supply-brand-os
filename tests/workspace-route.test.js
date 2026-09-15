@@ -1,6 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
 import {claimWorkspaceRoute,workspaceRouteToken,isWorkspaceRouteCurrent,workspaceRouteSnapshot,routeNameFromNavElement,workspaceRouteFromHeading} from '../public/workspace-route.js';
+
+const index=await readFile(new URL('../public/index.html',import.meta.url),'utf8');
+const count=(source,needle)=>source.split(needle).length-1;
+
+test('workspace route guard loads exactly once before app workspace modules',()=>{
+  assert.equal(count(index,'workspace-route.js'),1);
+  assert.ok(index.indexOf('workspace-route.js')<index.indexOf('app.js'));
+  assert.ok(index.indexOf('workspace-route.js')<index.indexOf('v2-operating-ui.js'));
+});
 
 test('claiming a new workspace invalidates the previous workspace token',()=>{
   const first=claimWorkspaceRoute('v2:cashforecast');
