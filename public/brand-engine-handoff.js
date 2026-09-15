@@ -26,11 +26,18 @@ async function authedRequest(url,method='GET',body){
 function removeHandoff({clear=true}={}){if(clear)localStorage.removeItem(PENDING_KEY);$('#brandEngineHandoff')?.remove()}
 function openBrands(){const button=$('#nav button[data-view="brands"]');if(button)button.click();else location.href='/'}
 function status(message,tone=''){const el=$('#brandEngineHandoffStatus');if(el){el.textContent=message;el.className=`brandEngineHandoffStatus ${tone}`.trim()}}
+function ensureBrandEngineLink(){
+  if($('#brandEngineNavLink'))return;
+  const side=$('.sidebottom');if(!side)return;
+  const link=document.createElement('a');link.id='brandEngineNavLink';link.className='ghost brandEngineNavLink';link.href='/brand-engine';link.innerHTML='<span>BE</span> Brand Engine · Free name tool';
+  const before=$('#learnBtn');if(before)side.insertBefore(link,before);else side.prepend(link);
+}
 
 function handoffHtml(name,signedIn){
   return `<div class="brandEngineHandoffRow"><div class="brandEngineHandoffCopy"><span class="kicker">BRAND ENGINE HANDOFF</span><h2>${signedIn?`Ready to initialize ${esc(name)}?`:`You picked ${esc(name)}.`}</h2><p>${signedIn?'Creating the brand is still your decision. Press Initialize to use one of your saved-brand slots.':'Sign in or create your account first. Brand OS will keep the name waiting and will not create anything automatically.'}</p></div><div class="brandEngineHandoffActions">${signedIn?`<button class="primary" id="brandEngineInitialize" type="button">Initialize ${esc(name)}</button>`:`<button class="primary" id="brandEngineAuth" type="button">Sign in / create account</button>`}<button class="outline" id="brandEngineChange" type="button">Back to Brand Engine</button><button class="outline" id="brandEngineDismiss" type="button">Dismiss</button></div></div><div id="brandEngineHandoffStatus" class="brandEngineHandoffStatus" role="status" aria-live="polite"></div>`;
 }
 function render(){
+  ensureBrandEngineLink();
   const name=pendingName();if(!name){removeHandoff({clear:false});return}
   const main=$('main'),app=$('#app');if(!main||!app)return;
   let panel=$('#brandEngineHandoff');if(!panel){panel=document.createElement('section');panel.id='brandEngineHandoff';panel.className='brandEngineHandoff';app.insertAdjacentElement('beforebegin',panel)}
