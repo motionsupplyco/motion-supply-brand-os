@@ -1,15 +1,19 @@
-import {generateBrandNames,domainCandidates,socialHandleCandidates} from './brand-engine-core.js';
+import {generateBrandNames,domainCandidates,socialHandleCandidates,trademarkSearchPlan} from './brand-engine-core.js';
 import {trackBrandEngine} from './brand-engine-analytics.js';
 
 const $=selector=>document.querySelector(selector);
 const $$=selector=>[...document.querySelectorAll(selector)];
-const esc=value=>String(value??'').replace(/[&<>\'\"]/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char]));
+const esc=value=>String(value??'').replace(/[&<>\'\"]/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt',"'":'&#39;','"':'&quot;'}[char]));
 const loadSession=()=>{try{return JSON.parse(localStorage.getItem('msbo_session')||'null')}catch{return null}};
 const entrypoint=()=>new URLSearchParams(location.search).get('src')==='sidebar'?'sidebar':'standalone';
 let currentNames=[];
 
 function toast(message,tone='neutral'){
   const el=$('#engineToast');if(!el)return;el.textContent=message;el.className=`engineToast ${tone} show`;clearTimeout(toast.timer);toast.timer=setTimeout(()=>el.classList.remove('show'),2600);
+}
+function copyText(value,success='Copied ✓'){
+  if(!navigator.clipboard?.writeText)return toast('Copy is not available in this browser. Select the text manually.','warn');
+  navigator.clipboard.writeText(String(value||'')).then(()=>toast(success,'good')).catch(()=>toast('Could not copy automatically.','warn'));
 }
 function generate({track=true}={}){
   const seedWords=$('#seedWords')?.value||'';
@@ -30,11 +34,25 @@ function handleHtml(handle){
   const tt=`https://www.tiktok.com/@${encodeURIComponent(handle)}`;
   return `<span class="handleLink">@${esc(handle)} <a href="${ig}" target="_blank" rel="noreferrer">IG ↗</a><a href="${tt}" target="_blank" rel="noreferrer">TikTok ↗</a></span>`;
 }
+function trademarkHtml(plan,index){
+  if(!plan)return '';
+  return `<div class="candidateBlock trademarkBlock"><div class="candidateTitle"><b>USPTO FEDERAL PRE-SCREEN</b><span class="chip">SCREENING ONLY</span></div>
+    <div class="trademarkQueries">
+      <div class="trademarkQuery"><span>EXACT WORDING</span><code>${esc(plan.exactQuery)}</code><button type="button" data-copy-trademark="${index}" data-trademark-query="exact">Copy</button></div>
+      <div class="trademarkQuery"><span>EXPANDED WORDS</span><code>${esc(plan.expandedQuery)}</code><button type="button" data-copy-trademark="${index}" data-trademark-query="expanded">Copy</button></div>
+    </div>
+    <div class="trademarkActions"><a class="outline" href="${esc(plan.officialUrl)}" target="_blank" rel="noreferrer">Open official USPTO search ↗</a></div>
+    <ul class="trademarkGuidance">${plan.guidance.map(step=>`<li>${esc(step)}</li>`).join('')}</ul>
+    <p class="trademarkDisclaimer">${esc(plan.disclaimer)}</p>
+  </div>`;
+}
 function nameCard(item,index){
   const domains=item.domains?.length?item.domains:domainCandidates(item.name);
   const handles=item.handles?.length?item.handles:socialHandleCandidates(item.name);
+  const trademark=item.trademark||trademarkSearchPlan(item.name);
   return `<article class="nameCard" data-name-index="${index}">
     <div class="nameCardTop"><div><span class="kicker">DIRECTION ${String(index+1).padStart(2,'0')}</span><h3>${esc(item.name)}</h3>${profileHtml(item.profile)}</div></div>
+    ${trademarkHtml(trademark,index)}
     <div class="candidateBlock"><div class="candidateTitle"><b>DOMAIN REGISTRATION SIGNAL</b><button type="button" data-check-domains="${index}">Check 3 domains</button></div><div class="domainList">${domains.map(domainStatusHtml).join('')}</div></div>
     <div class="candidateBlock"><div class="candidateTitle"><b>SOCIAL HANDLE VERIFICATION</b><span class="chip">VERIFY MANUALLY</span></div><div class="handles">${handles.slice(0,4).map(handleHtml).join('')}</div></div>
     <div class="cardActions"><button class="primary" type="button" data-use-name="${index}">Initialize in Brand OS</button><button class="outline" type="button" data-copy-name="${index}">Copy name</button></div>
@@ -90,8 +108,9 @@ async function initializeBrand(index){
 document.addEventListener('click',event=>{
   if(event.target.closest('#generateNames')||event.target.closest('#regenerate')){generate();return}
   const domainButton=event.target.closest('[data-check-domains]');if(domainButton){checkDomains(Number(domainButton.dataset.checkDomains));return}
+  const trademarkButton=event.target.closest('[data-copy-trademark]');if(trademarkButton){const item=currentNames[Number(trademarkButton.dataset.copyTrademark)];const plan=item?.trademark||trademarkSearchPlan(item?.name);if(plan){const value=trademarkButton.dataset.trademarkQuery==='expanded'?plan.expandedQuery:plan.exactQuery;copyText(value,'USPTO search query copied ✓')}return}
   const useButton=event.target.closest('[data-use-name]');if(useButton){initializeBrand(Number(useButton.dataset.useName));return}
-  const copyButton=event.target.closest('[data-copy-name]');if(copyButton){const item=currentNames[Number(copyButton.dataset.copyName)];if(item)navigator.clipboard?.writeText(item.name).then(()=>toast('Name copied ✓','good')).catch(()=>toast('Could not copy automatically.','warn'));return}
+  const copyButton=event.target.closest('[data-copy-name]');if(copyButton){const item=currentNames[Number(copyButton.dataset.copyName)];if(item)copyText(item.name,'Name copied ✓');return}
 });
 
 document.addEventListener('keydown',event=>{if(event.key==='Enter'&&event.target.closest('.engineForm')){event.preventDefault();generate()}});
