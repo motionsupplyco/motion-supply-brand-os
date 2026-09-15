@@ -40,22 +40,34 @@ test('launch and V2 early-warning events are accepted by product analytics',()=>
   ])assert.match(server,new RegExp(`['\"]${event}['\"]`),`missing allowed event ${event}`);
 });
 
-test('browser-facing integration list projection never selects token ciphertext fields',()=>{
+test('browser-facing integration list projection never selects credentials or generic metadata',()=>{
   const start=indexOfOrFail(routes,"app.get('/api/v2/integrations'");
   const end=indexOfOrFail(routes,"app.post('/api/v2/integrations/shopify/connect'",start);
   const block=routes.slice(start,end);
   assert.doesNotMatch(block,/access_token_ciphertext|refresh_token_ciphertext/);
+  assert.doesNotMatch(block,/\bmetadata\b/);
   assert.match(block,/access_token_expires_at/);
   assert.match(block,/refresh_token_expires_at/);
 });
 
-test('public connection serializer exposes expiry metadata but never credentials',()=>{
+test('public connection serializer exposes only allowlisted non-secret fields',()=>{
   const start=indexOfOrFail(routes,'function publicConnection(row)');
   const end=indexOfOrFail(routes,'async function loadShopifyConnection',start);
   const block=routes.slice(start,end);
-  assert.doesNotMatch(block,/ciphertext|accessToken\s*:|refreshToken\s*:/);
+  assert.doesNotMatch(block,/ciphertext|accessToken\s*:|refreshToken\s*:|\bmetadata\s*:/);
   assert.match(block,/accessTokenExpiresAt/);
   assert.match(block,/refreshTokenExpiresAt/);
+  assert.match(block,/lastSyncedAt/);
+});
+
+test('Shopify webhook handler uses retry-aware claim helper instead of treating every unique conflict as completed',()=>{
+  const start=indexOfOrFail(routes,"app.post('/api/integrations/shopify/webhook'");
+  const end=indexOfOrFail(routes,'export function registerV2Routes',start);
+  const block=routes.slice(start,end);
+  assert.match(block,/claimShopifyWebhookEvent\(\{admin,eventId,eventType:topic,payloadHash\}\)/);
+  assert.match(block,/claim\.rejected/);
+  assert.match(block,/claim\.reclaimed/);
+  assert.doesNotMatch(block,/claimError\.code\)===?'23505'|String\(claimError\.code\)==='23505'/);
 });
 
 test('Shopify uninstall clears stored token ciphertext instead of leaving dormant credentials',()=>{
@@ -65,14 +77,16 @@ test('Shopify uninstall clears stored token ciphertext instead of leaving dorman
   assert.match(routes,/status:'disconnected'/);
 });
 
-test('V2 integration routes remain Pro-gated where account data is exposed or mutated',()=>{
+test('V2 integration and operating routes remain Pro-gated where account data is exposed or mutated',()=>{
   const protectedRoutes=[
     "app.get('/api/v2/integrations'",
     "app.post('/api/v2/integrations/shopify/connect'",
     "app.post('/api/v2/integrations/shopify/sync'",
+    "app.delete('/api/v2/integrations/:provider/:brandId'",
     "app.get('/api/v2/operating-data'",
     "app.get('/api/v2/cash-forecasts'",
     "app.post('/api/v2/cash-forecasts'",
+    "app.put('/api/v2/cash-forecasts/:id'",
     "app.post('/api/v2/operating-analysis'",
     "app.get('/api/v2/operating-alerts'"
   ];
