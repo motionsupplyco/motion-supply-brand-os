@@ -16,6 +16,10 @@ const DEMO_TIMELINE_KEY='msbo_demo_production_timeline_v1';
 function loadJson(key,fallback=null){try{return JSON.parse(localStorage.getItem(key)||'null')??fallback}catch{return fallback}}
 function saveJson(key,value){localStorage.setItem(key,JSON.stringify(value))}
 function blankChecks(){return Object.fromEntries(PRODUCTION_PREFLIGHT_CHECKS.map(check=>[check.id,'missing']))}
+function productionContextKey(preflight={}){
+  if(mode().startsWith('demo'))return 'demo:foundry-eight';
+  return [preflight.factoryName||'',preflight.styleName||'',preflight.quoteReference||''].join('|');
+}
 function flash(message,tone='neutral'){
   let el=$('#manufacturingHandoffFlash');
   if(!el){el=document.createElement('div');el.id='manufacturingHandoffFlash';el.className='v2Flash';document.body.appendChild(el)}
@@ -71,7 +75,8 @@ function enhanceQuoteCompare(){
 
 function timelineStorageKey(){return mode().startsWith('demo')?DEMO_TIMELINE_KEY:TIMELINE_KEY}
 function loadTimelineModel(preflight={}){
-  const saved=loadJson(timelineStorageKey(),{})||{};
+  const raw=loadJson(timelineStorageKey(),{})||{};
+  const saved=raw.contextKey===productionContextKey(preflight)?raw:{};
   return {
     depositDate:saved.depositDate||'',targetLaunchDate:saved.targetLaunchDate||'',
     productionLeadDays:saved.productionLeadDays??preflight.productionLeadDays??null,
@@ -80,8 +85,10 @@ function loadTimelineModel(preflight={}){
   };
 }
 function saveTimelineFromDom(){
-  const model=loadTimelineModel(loadJson(PREFLIGHT_KEY,{}));
+  const preflight=loadJson(PREFLIGHT_KEY,{})||{};
+  const model=loadTimelineModel(preflight);
   $$('[data-timeline-key]').forEach(input=>{const key=input.dataset.timelineKey;model[key]=input.type==='date'?String(input.value||''):(input.value===''?null:Math.max(0,Math.trunc(num(input.value))))});
+  model.contextKey=productionContextKey(preflight);
   saveJson(timelineStorageKey(),model);return model;
 }
 function timelineField(key,label,value,{type='number',placeholder=''}={}){
@@ -122,10 +129,16 @@ function enhanceProductionTimeline(anchor){
 }
 function updateTimelineResult(){const model=saveTimelineFromDom();const out=$('#productionTimelineResult');if(out)out.innerHTML=timelineResultHtml(model)}
 
-function loadTiming(){return {...{depositWeek:null,balanceWeek:null,freightDutyWeek:null,inspectionOtherWeek:null},...(loadJson(TIMING_KEY,{})||{})}}
+function loadTiming(){
+  const preflight=loadJson(PREFLIGHT_KEY,{})||{};
+  const raw=loadJson(TIMING_KEY,{})||{};
+  const saved=raw.contextKey===productionContextKey(preflight)?raw:{};
+  return {depositWeek:null,balanceWeek:null,freightDutyWeek:null,inspectionOtherWeek:null,...saved};
+}
 function saveTimingFromDom(){
   const timing=loadTiming();
   $$('[data-manufacturing-week]').forEach(input=>{timing[input.dataset.manufacturingWeek]=input.value===''?null:Math.trunc(num(input.value))});
+  timing.contextKey=productionContextKey(loadJson(PREFLIGHT_KEY,{})||{});
   saveJson(TIMING_KEY,timing);return timing;
 }
 function preflightTransfer(){
@@ -198,6 +211,11 @@ function applyPending(){
 }
 function discardPending(){localStorage.removeItem(MANUFACTURING_CASH_TRANSFER_KEY);$('#manufacturingCashPending')?.remove();flash('Pending manufacturing cash transfer discarded.','neutral')}
 
+function resetRunScopedPanels(){
+  $('#productionTimelinePanel')?.remove();
+  $('#manufacturingCashTiming')?.remove();
+  queueMicrotask(enhancePreflight);
+}
 function enhance(){
   const title=currentTitle();
   if(title==='Factory Quote Compare')enhanceQuoteCompare();
@@ -216,6 +234,7 @@ document.addEventListener('click',event=>{
 document.addEventListener('change',event=>{
   if(event.target.matches('[data-manufacturing-week]'))saveTimingFromDom();
   if(event.target.matches('[data-timeline-key]'))updateTimelineResult();
+  if(event.target.matches('[data-preflight-text="factoryName"],[data-preflight-text="styleName"],[data-preflight-text="quoteReference"]'))resetRunScopedPanels();
 });
 
 const app=$('#app');if(app)new MutationObserver(()=>queueMicrotask(enhance)).observe(app,{childList:true,subtree:true});
