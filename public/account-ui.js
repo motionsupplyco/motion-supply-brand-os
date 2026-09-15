@@ -76,7 +76,7 @@ async function authenticate(kind){
     try{
       const data=await request(`/api/auth/${kind}`,'POST',{email,password});
       if(data.confirmationRequired){
-        modal(`<div class="authscreen"><span class="kicker">ONE MORE STEP</span><h2>Check your email</h2><p>We sent a confirmation link to <strong>${escapeHtml(email)}</strong>.</p><p class="mini">Open that link to finish creating your account. If it doesn’t arrive in a few minutes, check Spam or Promotions.</p><div class="split mt"><button id="acctAfterSignupSignin" class="outline" type="button">Sign in</button><button id="acctAfterSignupRecover" class="outline" type="button">Forgot password</button></div><p class="mini mt">Still no email? If you may already have an account, use Sign in or Forgot password.</p></div>`);
+        modal(`<div class="authscreen"><span class="kicker">ONE MORE STEP</span><h2>Check your email</h2><p>Look for a confirmation link at <strong>${escapeHtml(email)}</strong>.</p><p class="mini">Open that link to finish creating your account. It can take a minute, so check Spam or Promotions too.</p><div class="split mt"><button id="acctAfterSignupSignin" class="outline" type="button">Sign in</button><button id="acctAfterSignupRecover" class="outline" type="button">Forgot password</button></div><p class="mini mt">No email after a few minutes? Use Sign in or Forgot password for account help.</p></div>`);
         const signin=$('#acctAfterSignupSignin');if(signin)signin.onclick=showSignIn;
         const recover=$('#acctAfterSignupRecover');if(recover)recover.onclick=showForgotPassword;
         return
