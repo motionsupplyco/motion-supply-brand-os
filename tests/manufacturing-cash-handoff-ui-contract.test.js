@@ -18,6 +18,13 @@ test('factory quote handoff resets preflight readiness instead of carrying appro
   assert.doesNotMatch(ui,/approvedFactory|trustedFactory|factoryVerified/);
 });
 
+test('Production Timeline uses founder-entered dates and durations without hidden average claims',()=>{
+  for(const key of ['depositDate','targetLaunchDate','productionLeadDays','inspectionDays','transitDays','customsBufferDays','receivingPrepDays','contentBufferDays'])assert.match(ui,new RegExp(key));
+  assert.match(ui,/No hidden industry-average lead time is added/i);
+  assert.match(ui,/CALENDAR-DAY MODEL/);
+  assert.match(ui,/productionTimeline\(model\)/);
+});
+
 test('preflight handoff requires explicit 13-week timing before a positive cash line can move',()=>{
   for(const key of ['depositWeek','balanceWeek','freightDutyWeek','inspectionOtherWeek'])assert.match(ui,new RegExp(key));
   assert.match(ui,/Choose a forecast week for:/);
@@ -36,6 +43,7 @@ test('unknown landed estimates stay disclosed in the pending cash card',()=>{
   assert.match(ui,/Those estimates are not included/);
 });
 
-test('handoff has responsive phone layout',()=>{
+test('handoff and production timeline have responsive phone layout',()=>{
+  assert.match(css,/productionTimelineGrid/);
   assert.match(css,/@media\(max-width:560px\)/);
 });
