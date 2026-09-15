@@ -99,10 +99,12 @@ test('billing routes keep duplicate-subscription prevention and customer portal 
   const portal=portalStart>=0&&apiFallback>portalStart?server.slice(portalStart,apiFallback):'';
   assert.match(checkout,/ALREADY_PRO/);
   assert.match(checkout,/BILLING_RECOVERY_REQUIRED/);
+  assert.match(checkout,/customerForCheckout/);
   assert.match(checkout,/stripe\.checkout\.sessions\.create/);
   assert.match(checkout,/STRIPE_PRO_PRICE_ID/);
+  assert.match(portal,/customerForPortal/);
   assert.match(portal,/stripe\.billingPortal\.sessions\.create/);
-  assert.match(portal,/stripe_customer_id/);
+  assert.match(portal,/portalCustomer\.customerId/);
 });
 
 test('API fallback and generic error handling stay in front of the static SPA fallback',()=>{
