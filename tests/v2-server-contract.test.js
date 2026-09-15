@@ -77,6 +77,14 @@ test('Shopify uninstall clears stored token ciphertext instead of leaving dorman
   assert.match(routes,/status:'disconnected'/);
 });
 
+test('operating analysis keeps missing cash forecast unknown instead of inventing zero headroom',()=>{
+  const start=indexOfOrFail(routes,"app.post('/api/v2/operating-analysis'");
+  const end=indexOfOrFail(routes,"app.get('/api/v2/operating-alerts'",start);
+  const block=routes.slice(start,end);
+  assert.match(block,/forecastHeadroom:forecast\?\.minimumHeadroom\?\?null/);
+  assert.doesNotMatch(block,/forecastHeadroom:forecast\?\.minimumHeadroom\?\?0/);
+});
+
 test('V2 integration and operating routes remain Pro-gated where account data is exposed or mutated',()=>{
   const protectedRoutes=[
     "app.get('/api/v2/integrations'",
