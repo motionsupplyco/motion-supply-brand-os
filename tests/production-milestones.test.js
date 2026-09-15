@@ -19,6 +19,14 @@ test('completed milestones report schedule variance without inferring a cause',(
   assert.equal(late.slippageDays,4);
 });
 
+test('future dates cannot be recorded as completed actuals',()=>{
+  const state=productionMilestoneStatus({plannedDate:'2026-09-20',actualDate:'2026-09-30',asOfDate:'2026-09-25'});
+  assert.equal(state.status,'invalid_future_actual');
+  const tracker=buildProductionMilestones({timeline:{productionComplete:'2026-09-20'},actuals:{productionCompleteDate:'2026-09-30'},asOfDate:'2026-09-25'});
+  assert.equal(tracker.counts.invalidFutureActual,1);
+  assert.equal(tracker.status,'needs_attention');
+});
+
 test('missing planned dates stay unscheduled instead of inventing deadlines',()=>{
   assert.equal(productionMilestoneStatus({asOfDate:'2026-09-15'}).status,'unscheduled');
   assert.equal(productionMilestoneStatus({actualDate:'2026-09-14',asOfDate:'2026-09-15'}).status,'completed_unscheduled');
