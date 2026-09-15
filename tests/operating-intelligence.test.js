@@ -90,9 +90,22 @@ test('reorder cash gate checks deposit pressure against forecast headroom',()=>{
   close(pass.cashDueNow,1370);
   close(pass.remainingHeadroom,630);
   assert.equal(pass.passes,true);
+  assert.equal(pass.status,'pass');
   const hold=reorderCashGate(reorder,{forecastHeadroom:1000,depositPct:50});
   assert.equal(hold.passes,false);
+  assert.equal(hold.status,'fail');
   close(hold.remainingHeadroom,-370);
+});
+
+test('reorder cash gate stays unknown when no cash forecast exists',()=>{
+  const reorder=reorderIntelligence({...FOUNDRY_EIGHT,moq:100});
+  const unknown=reorderCashGate(reorder,{forecastHeadroom:null,depositPct:50});
+  assert.equal(unknown.status,'unknown');
+  assert.equal(unknown.passes,null);
+  assert.equal(unknown.forecastHeadroom,null);
+  assert.equal(unknown.remainingHeadroom,null);
+  close(unknown.cashDueNow,1370);
+  assert.match(unknown.note,/Save a cash forecast/i);
 });
 
 test('operating alerts prioritize cash breaches and urgent reorder reviews',()=>{
