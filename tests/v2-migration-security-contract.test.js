@@ -15,9 +15,17 @@ test('V2 migration keeps browser roles out of server-proxied operating tables',(
 });
 
 test('brand-scoped V2 rows prove brand ownership through the existing brands composite key',()=>{
-  const brandScoped=['integration_connections','integration_sync_runs','commerce_daily_snapshots','inventory_snapshots','sku_planning_settings','cash_forecasts','operating_alerts'];
-  for(const table of brandScoped){
-    assert.match(migration,new RegExp(`${table}[_a-z]*brand_owner_fk[\\s\\S]*foreign key \\(brand_id, owner_id\\) references public\\.brands\\(id, owner_id\\)`,'i'));
+  const constraints=[
+    'integration_connections_brand_owner_fk',
+    'integration_sync_runs_brand_owner_fk',
+    'commerce_daily_snapshots_brand_owner_fk',
+    'inventory_snapshots_brand_owner_fk',
+    'sku_planning_brand_owner_fk',
+    'cash_forecasts_brand_owner_fk',
+    'operating_alerts_brand_owner_fk'
+  ];
+  for(const name of constraints){
+    assert.match(migration,new RegExp(`constraint ${name} foreign key \\(brand_id, owner_id\\) references public\\.brands\\(id, owner_id\\)`,'i'));
   }
 });
 
