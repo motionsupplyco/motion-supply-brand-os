@@ -8,6 +8,7 @@ import { createClient } from '@supabase/supabase-js';
 import { claimStripeWebhook, completeStripeWebhook, failStripeWebhook } from './lib/stripe-webhook-state.js';
 import { customerForCheckout, customerForPortal, sanitizeStripeBilling } from './lib/stripe-customer-recovery.integration.js';
 import { registerV2PreJsonRoutes, registerV2Routes } from './lib/v2-routes.js';
+import { registerV2PlanningRoutes } from './lib/v2-planning-routes.js';
 
 const __dirname=path.dirname(fileURLToPath(import.meta.url));
 const app=express(); const port=Number(process.env.PORT||3000);
@@ -58,6 +59,7 @@ registerV2PreJsonRoutes(app,{admin,appUrl,env:process.env});
 
 app.use(express.json({limit:'256kb'})); app.use('/api',apiLimit);
 registerV2Routes(app,{admin,appUrl,requireProUser,env:process.env});
+registerV2PlanningRoutes(app,{admin,requireProUser});
 
 app.get('/api/public-config',(req,res)=>res.json({authConfigured:hasPublic&&hasAdmin,cloudConfigured:hasAdmin,billingConfigured:stripeConfigured&&Boolean(process.env.STRIPE_WEBHOOK_SECRET)&&hasAdmin,supportUrl:process.env.SUPPORT_URL||null,privacyUrl:process.env.PRIVACY_URL||null,termsUrl:process.env.TERMS_URL||null}));
 app.get('/api/health',(req,res)=>res.json({ok:true,authConfigured:hasPublic&&hasAdmin,cloudConfigured:hasAdmin,billingConfigured:stripeConfigured&&Boolean(process.env.STRIPE_WEBHOOK_SECRET)&&hasAdmin}));
