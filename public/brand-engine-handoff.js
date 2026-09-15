@@ -1,3 +1,5 @@
+import {trackBrandEngine} from './brand-engine-analytics.js';
+
 const $=selector=>document.querySelector(selector);
 const esc=value=>String(value??'').replace(/[&<>\'\"]/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char]));
 const PENDING_KEY='msbo_pending_brand_name';
@@ -29,7 +31,7 @@ function status(message,tone=''){const el=$('#brandEngineHandoffStatus');if(el){
 function ensureBrandEngineLink(){
   if($('#brandEngineNavLink'))return;
   const side=$('.sidebottom');if(!side)return;
-  const link=document.createElement('a');link.id='brandEngineNavLink';link.className='ghost brandEngineNavLink';link.href='/brand-engine';link.innerHTML='<span>BE</span> Brand Engine · Free name tool';
+  const link=document.createElement('a');link.id='brandEngineNavLink';link.className='ghost brandEngineNavLink';link.href='/brand-engine?src=sidebar';link.innerHTML='<span>BE</span> Brand Engine · Free name tool';
   const before=$('#learnBtn');if(before)side.insertBefore(link,before);else side.prepend(link);
 }
 
@@ -50,6 +52,7 @@ async function initialize(){
   try{
     const payload=await authedRequest('/api/brands','POST',{name});
     localStorage.removeItem(PENDING_KEY);
+    trackBrandEngine('brand_engine_brand_initialized',{signed_in:true,entrypoint:'handoff'});
     if(button){button.disabled=true;button.textContent='Initialized ✓'}
     status(`${payload.brand?.name||name} is now saved in Brand OS.`, 'good');
     const actions=$('.brandEngineHandoffActions');if(actions&&!$('#brandEngineOpenBrands')){const open=document.createElement('button');open.id='brandEngineOpenBrands';open.className='outline';open.type='button';open.textContent='Open Brands & SKUs';open.addEventListener('click',openBrands);actions.appendChild(open)}
