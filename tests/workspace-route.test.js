@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {claimWorkspaceRoute,workspaceRouteToken,isWorkspaceRouteCurrent,workspaceRouteSnapshot,routeNameFromNavElement} from '../public/workspace-route.js';
+import {claimWorkspaceRoute,workspaceRouteToken,isWorkspaceRouteCurrent,workspaceRouteSnapshot,routeNameFromNavElement,workspaceRouteFromHeading} from '../public/workspace-route.js';
 
 test('claiming a new workspace invalidates the previous workspace token',()=>{
   const first=claimWorkspaceRoute('v2:cashforecast');
@@ -25,6 +25,14 @@ test('route naming covers every Brand OS navigation family',()=>{
   assert.equal(routeNameFromNavElement({dataset:{v2View:'cashforecast'}}),'v2:cashforecast');
   assert.equal(routeNameFromNavElement({dataset:{view:'dashboard'}}),'core:dashboard');
   assert.equal(routeNameFromNavElement({id:'memoryNav',dataset:{}}),'core:memory');
+});
+
+test('V2 rendered headings map back to exact workspace routes for stale-render recovery',()=>{
+  assert.equal(workspaceRouteFromHeading('13-Week Cash Forecast'),'v2:cashforecast');
+  assert.equal(workspaceRouteFromHeading('Reorder Intelligence'),'v2:reorderintel');
+  assert.equal(workspaceRouteFromHeading('Operating Alerts'),'v2:operatingalerts');
+  assert.equal(workspaceRouteFromHeading('Integrations Center'),'v2:integrations');
+  assert.equal(workspaceRouteFromHeading('Business Health'),null);
 });
 
 test('snapshot reports current route and generation',()=>{
