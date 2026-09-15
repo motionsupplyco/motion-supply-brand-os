@@ -56,17 +56,21 @@ with expected(table_name) as (
     ('cash_forecasts'),
     ('operating_alerts'),
     ('integration_webhook_events')
+), existing as (
+  select e.table_name,c.oid as relation_oid
+  from expected e
+  join pg_namespace n on n.nspname='public'
+  join pg_class c on c.relnamespace=n.oid and c.relname=e.table_name and c.relkind='r'
 ), roles(role_name) as (
   values ('anon'),('authenticated')
 ), privileges(privilege_name) as (
   values ('SELECT'),('INSERT'),('UPDATE'),('DELETE'),('TRUNCATE'),('REFERENCES'),('TRIGGER')
 ), leaked as (
   select r.role_name,e.table_name,p.privilege_name
-  from expected e
+  from existing e
   cross join roles r
   cross join privileges p
-  where to_regclass('public.' || e.table_name) is not null
-    and has_table_privilege(r.role_name,'public.' || quote_ident(e.table_name),p.privilege_name)
+  where has_table_privilege(r.role_name,e.relation_oid,p.privilege_name)
 )
 select
   'browser_direct_privileges_revoked' as check_name,
