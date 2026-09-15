@@ -12,6 +12,7 @@ function diffDays(later,earlier){return Math.round((later.getTime()-earlier.getT
 
 export function productionMilestoneStatus({plannedDate=null,actualDate=null,asOfDate=null,dueSoonDays=7}={}){
   const planned=parseIsoDate(plannedDate),actual=parseIsoDate(actualDate),asOf=parseIsoDate(asOfDate);
+  if(actual&&asOf&&actual.getTime()>asOf.getTime())return {status:'invalid_future_actual',slippageDays:null,daysUntil:null};
   if(actual){
     if(!planned)return {status:'completed_unscheduled',slippageDays:null,daysUntil:null};
     const slippageDays=diffDays(actual,planned);
@@ -46,14 +47,15 @@ export function buildProductionMilestones({timeline={},actuals={},asOfDate=null,
     dueSoon:milestones.filter(item=>item.status==='due_soon').length,
     completed:milestones.filter(item=>item.status.startsWith('completed_')).length,
     completedLate:milestones.filter(item=>item.status==='completed_late').length,
+    invalidFutureActual:milestones.filter(item=>item.status==='invalid_future_actual').length,
     open:milestones.filter(item=>['scheduled','upcoming','due_soon','overdue'].includes(item.status)).length,
     unscheduled:milestones.filter(item=>item.status==='unscheduled').length
   };
   const datedOpen=milestones.filter(item=>item.plannedDate&&!item.actualDate).sort((a,b)=>String(a.plannedDate).localeCompare(String(b.plannedDate)));
   const nextMilestone=datedOpen[0]||null;
   const anyPlanned=milestones.some(item=>item.plannedDate||item.actualDate);
-  const allTrackedComplete=anyPlanned&&milestones.filter(item=>item.plannedDate).every(item=>Boolean(item.actualDate));
-  const status=!anyPlanned?'unscoped':counts.overdue>0?'needs_attention':allTrackedComplete?'complete':'active';
+  const allTrackedComplete=anyPlanned&&milestones.filter(item=>item.plannedDate).every(item=>Boolean(item.actualDate)&&item.status!=='invalid_future_actual');
+  const status=!anyPlanned?'unscoped':(counts.overdue>0||counts.invalidFutureActual>0)?'needs_attention':allTrackedComplete?'complete':'active';
   return {
     status,milestones,counts,nextMilestone,
     disclaimer:'Milestone status compares founder-entered modeled dates with founder-recorded actual dates. Brand OS does not infer why a milestone moved or guarantee future dates.'
