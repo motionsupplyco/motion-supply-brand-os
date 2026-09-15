@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
-import {SHOPIFY_WEBHOOK_TOPICS,SHOPIFY_WEBHOOK_LIST_QUERY,SHOPIFY_WEBHOOK_CREATE_MUTATION,verifyShopifyWebhookHmac,ensureShopifyWebhooks} from '../lib/shopify-webhooks.js';
+import {SHOPIFY_WEBHOOK_TOPICS,SHOPIFY_WEBHOOK_LIST_QUERY,SHOPIFY_WEBHOOK_CREATE_MUTATION,SHOPIFY_WEBHOOK_CLAIM_STALE_MS,verifyShopifyWebhookHmac,classifyShopifyWebhookDuplicate,ensureShopifyWebhooks} from '../lib/shopify-webhooks.js';
 
 test('Shopify webhook verifier authenticates the raw body with base64 HMAC',()=>{
   const body=Buffer.from('{"id":123,"topic":"orders/create"}');
@@ -10,6 +10,22 @@ test('Shopify webhook verifier authenticates the raw body with base64 HMAC',()=>
   assert.equal(verifyShopifyWebhookHmac(body,hmac,secret),true);
   assert.equal(verifyShopifyWebhookHmac(Buffer.from('{}'),hmac,secret),false);
   assert.equal(verifyShopifyWebhookHmac(body,'not-a-valid-signature',secret),false);
+});
+
+test('completed webhook IDs dedupe but failed claims can be retried',()=>{
+  const hash='abc123';
+  assert.deepEqual(classifyShopifyWebhookDuplicate({status:'completed',payload_sha256:hash,claimed_at:'2026-09-15T08:00:00.000Z'},{payloadHash:hash,nowMs:Date.parse('2026-09-15T08:01:00.000Z')}),{action:'duplicate',reason:'completed'});
+  assert.deepEqual(classifyShopifyWebhookDuplicate({status:'failed',payload_sha256:hash,claimed_at:'2026-09-15T08:00:00.000Z'},{payloadHash:hash,nowMs:Date.parse('2026-09-15T08:01:00.000Z')}),{action:'reclaim',reason:'failed'});
+});
+
+test('active processing claims dedupe while stale claims can be reclaimed',()=>{
+  const now=Date.parse('2026-09-15T08:20:00.000Z'),hash='same';
+  assert.deepEqual(classifyShopifyWebhookDuplicate({status:'processing',payload_sha256:hash,claimed_at:'2026-09-15T08:19:00.000Z'},{payloadHash:hash,nowMs:now}),{action:'duplicate',reason:'processing'});
+  assert.deepEqual(classifyShopifyWebhookDuplicate({status:'processing',payload_sha256:hash,claimed_at:new Date(now-SHOPIFY_WEBHOOK_CLAIM_STALE_MS-1).toISOString()},{payloadHash:hash,nowMs:now}),{action:'reclaim',reason:'stale_processing'});
+});
+
+test('same webhook ID with a different payload hash is rejected instead of silently deduped',()=>{
+  assert.deepEqual(classifyShopifyWebhookDuplicate({status:'failed',payload_sha256:'original',claimed_at:'2026-09-15T08:00:00.000Z'},{payloadHash:'different'}),{action:'reject',reason:'payload_mismatch'});
 });
 
 test('webhook registration only creates missing topic+URI pairs',async()=>{
