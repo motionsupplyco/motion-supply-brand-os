@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {normalizeDomain,rdapBaseForDomain,lookupDomainRdap,RDAP_BOOTSTRAP_URL} from '../lib/rdap-domain.js';
+import {normalizeDomain,rdapBaseForDomain,lookupDomainRdap,checkDomainsRdap,RDAP_BOOTSTRAP_URL} from '../lib/rdap-domain.js';
 
 const bootstrap={services:[[['com'],['https://rdap.example/']], [['co'],['https://rdap.co.example']]]};
 
@@ -61,4 +61,27 @@ test('provider errors stay unknown instead of producing false availability',asyn
   assert.equal(result.status,'unknown');
   assert.equal(result.registered,null);
   assert.match(result.reason,/429/);
+});
+
+test('batch domain check fetches IANA bootstrap once and caps request size',async()=>{
+  const calls=[];
+  const fetchImpl=async url=>{
+    calls.push(String(url));
+    if(String(url)===RDAP_BOOTSTRAP_URL)return {ok:true,status:200,json:async()=>bootstrap};
+    if(String(url).includes('rdap.example'))return {ok:false,status:404,json:async()=>({})};
+    return {ok:true,status:200,json:async()=>({handle:'CO-1',status:['active']})};
+  };
+  const results=await checkDomainsRdap(['voiddept.com','voiddept.co'],{fetchImpl});
+  assert.equal(results.length,2);
+  assert.equal(calls.filter(url=>url===RDAP_BOOTSTRAP_URL).length,1);
+  assert.equal(results[0].status,'not_found');
+  assert.equal(results[1].status,'registered');
+  await assert.rejects(checkDomainsRdap(['a.com','b.com','c.com','d.com'],{fetchImpl}),/up to 3 domains/i);
+});
+
+test('bootstrap failure makes every requested domain unknown rather than available',async()=>{
+  const fetchImpl=async()=>({ok:false,status:503,json:async()=>({})});
+  const results=await checkDomainsRdap(['voiddept.com','voiddept.co'],{fetchImpl});
+  assert.equal(results.length,2);
+  assert.ok(results.every(result=>result.status==='unknown'&&result.registered===null));
 });
