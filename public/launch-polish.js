@@ -33,7 +33,7 @@ function patchPricing(){
 
       if(selector!=='#billingBtn'&&button.textContent.includes(PRO_PRICE_BUTTON)){
         const next=button.nextElementSibling;
-        if(!next?.matches(`[data-pro-price-note="${noteKey}"]`)){
+        if(!next?.matches('[data-pro-price-note]')){
           const note=document.createElement('p');
           note.className='mini mt';
           note.dataset.proPriceNote=noteKey;
