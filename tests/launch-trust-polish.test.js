@@ -39,6 +39,7 @@ test('Pro price display is centralized and covers every upgrade surface',async()
   assert.match(polish,/PRO_PRICE_MONTHLY=19/);
   assert.match(polish,/Brand OS Pro — \$\{PRO_PRICE_LABEL\} · Cancel anytime\./);
   assert.match(polish,/querySelectorAll/,'pricing enhancer must patch every rendered matching upgrade surface');
+  assert.ok(polish.includes("next?.matches('[data-pro-price-note]')"),'overlapping legacy/action hooks must not create duplicate price notes');
 
   for(const selector of ['#billingBtn','#upgradeNow','#acctBillingOpen','#memoryUpgrade','[data-v2-action="upgrade"]',...newGates.map(([, ,selector])=>selector)]){
     assert.ok(polish.includes(selector),`launch pricing must cover ${selector}`);
