@@ -101,9 +101,22 @@ export function reorderIntelligence(input={}){
 
 export function reorderCashGate(reorder={},options={}){
   const depositPct=clamp(options.depositPct??100,0,100);
-  const forecastHeadroom=finite(options.forecastHeadroom);
+  const hasForecastHeadroom=options.forecastHeadroom!==null&&options.forecastHeadroom!==undefined&&options.forecastHeadroom!==''&&Number.isFinite(Number(options.forecastHeadroom));
+  const forecastHeadroom=hasForecastHeadroom?Number(options.forecastHeadroom):null;
   const reviewCashRequired=nonNegative(reorder.reviewCashRequired);
   const cashDueNow=reviewCashRequired*depositPct/100;
+  if(!hasForecastHeadroom){
+    return {
+      depositPct,
+      reviewCashRequired,
+      cashDueNow,
+      forecastHeadroom:null,
+      remainingHeadroom:null,
+      passes:null,
+      status:'unknown',
+      note:'Save a cash forecast before treating this reorder as cash-safe or cash-blocked.'
+    };
+  }
   const remainingHeadroom=forecastHeadroom-cashDueNow;
   return {
     depositPct,
@@ -112,6 +125,7 @@ export function reorderCashGate(reorder={},options={}){
     forecastHeadroom,
     remainingHeadroom,
     passes:remainingHeadroom>=0,
+    status:remainingHeadroom>=0?'pass':'fail',
     note:remainingHeadroom>=0?'The modeled deposit stays above the selected cash headroom. Confirm timing and supplier terms before ordering.':'The modeled deposit would consume more than the selected cash headroom. Reduce units, improve terms, delay the PO, or increase available cash.'
   };
 }
