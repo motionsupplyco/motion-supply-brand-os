@@ -106,3 +106,28 @@ test('operating alerts prioritize cash breaches and urgent reorder reviews',()=>
   assert.ok(alerts.some(x=>x.type==='acquisition_efficiency'));
   assert.match(alerts.find(x=>x.type==='acquisition_efficiency').detail,/observation, not proof of causation/i);
 });
+
+test('production milestone alerts surface overdue and due-soon modeled dates without assigning cause',()=>{
+  const alerts=buildOperatingAlerts({productionMilestones:{milestones:[
+    {id:'production',label:'Production complete',plannedDate:'2026-09-10',status:'overdue',daysUntil:-5},
+    {id:'qc',label:'Inspection / QC complete',plannedDate:'2026-09-18',status:'due_soon',daysUntil:3}
+  ]}});
+  assert.equal(alerts.length,2);
+  const overdue=alerts.find(x=>x.entityKey==='production:production');
+  const dueSoon=alerts.find(x=>x.entityKey==='production:qc');
+  assert.equal(overdue.severity,'critical');
+  assert.equal(dueSoon.severity,'warning');
+  assert.match(overdue.title,/missed its modeled date/i);
+  assert.match(overdue.detail,/does not infer the cause/i);
+  assert.equal(overdue.evidence.daysUntil,-5);
+  assert.match(dueSoon.detail,/record the actual completion/i);
+});
+
+test('production alert engine stays quiet for completed, upcoming and unscheduled milestones',()=>{
+  const alerts=buildOperatingAlerts({productionMilestones:{milestones:[
+    {id:'po',label:'Deposit / PO',plannedDate:'2026-09-01',actualDate:'2026-09-01',status:'completed_on_time',slippageDays:0},
+    {id:'arrival',label:'Inventory arrival',plannedDate:'2026-10-20',status:'upcoming',daysUntil:35},
+    {id:'launch',label:'Launch',plannedDate:null,status:'unscheduled',daysUntil:null}
+  ]}});
+  assert.equal(alerts.length,0);
+});
