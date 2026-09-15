@@ -92,6 +92,32 @@ create table if not exists public.inventory_snapshots (
 create index if not exists inventory_snapshots_brand_time_idx on public.inventory_snapshots(owner_id, brand_id, captured_at desc);
 create index if not exists inventory_snapshots_external_idx on public.inventory_snapshots(owner_id, brand_id, source, external_variant_id, captured_at desc);
 
+-- Founder planning inputs are kept separate from live source observations. A Shopify sync never overwrites these rules.
+create table if not exists public.sku_planning_settings (
+  id uuid primary key default gen_random_uuid(),
+  owner_id uuid not null references auth.users(id) on delete cascade,
+  brand_id uuid not null,
+  item_key text not null check (char_length(item_key) between 1 and 220),
+  sku_id uuid,
+  source text not null default 'manual' check (source in ('manual','shopify')),
+  external_variant_id text,
+  sku_code text,
+  label text,
+  lead_weeks numeric(8,2) not null default 0 check (lead_weeks >= 0),
+  high_weekly_demand numeric(14,4) check (high_weekly_demand is null or high_weekly_demand >= 0),
+  moq integer not null default 0 check (moq >= 0),
+  deposit_pct numeric(6,2) not null default 100 check (deposit_pct >= 0 and deposit_pct <= 100),
+  landed_cost numeric(14,2) check (landed_cost is null or landed_cost >= 0),
+  supplier_notes text,
+  active boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint sku_planning_brand_owner_fk foreign key (brand_id, owner_id) references public.brands(id, owner_id) on delete cascade,
+  constraint sku_planning_sku_fk foreign key (sku_id) references public.skus(id) on delete set null,
+  unique(owner_id, brand_id, item_key)
+);
+create index if not exists sku_planning_owner_brand_idx on public.sku_planning_settings(owner_id, brand_id, updated_at desc);
+
 create table if not exists public.cash_forecasts (
   id uuid primary key default gen_random_uuid(),
   owner_id uuid not null references auth.users(id) on delete cascade,
@@ -145,6 +171,7 @@ alter table public.integration_connections enable row level security;
 alter table public.integration_sync_runs enable row level security;
 alter table public.commerce_daily_snapshots enable row level security;
 alter table public.inventory_snapshots enable row level security;
+alter table public.sku_planning_settings enable row level security;
 alter table public.cash_forecasts enable row level security;
 alter table public.operating_alerts enable row level security;
 alter table public.integration_webhook_events enable row level security;
@@ -155,6 +182,7 @@ revoke all on public.integration_connections,
   public.integration_sync_runs,
   public.commerce_daily_snapshots,
   public.inventory_snapshots,
+  public.sku_planning_settings,
   public.cash_forecasts,
   public.operating_alerts,
   public.integration_webhook_events from anon, authenticated;
@@ -162,4 +190,5 @@ revoke all on public.integration_connections,
 comment on table public.integration_connections is 'Server-only encrypted third-party connection records. Never return ciphertext fields to browsers.';
 comment on table public.commerce_daily_snapshots is 'PII-minimized daily operating aggregates. Null means unavailable/not measured; zero means measured zero.';
 comment on table public.inventory_snapshots is 'Source-aware inventory observations; does not overwrite user-maintained SKU records.';
+comment on table public.sku_planning_settings is 'Founder-controlled supplier/reorder assumptions separate from synced observations.';
 comment on table public.operating_alerts is 'Evidence-backed founder alerts. Alerts are recommendations/observations, not automatic purchasing actions.';
