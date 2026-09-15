@@ -44,3 +44,16 @@ test('account deletion cancels any non-terminal Stripe subscription state',()=>{
   assert.match(route,/if\(stripe&&hasOpenStripeSub\(sub\)\)await stripe\.subscriptions\.cancel\(sub\.stripe_subscription_id\)/);
   assert.doesNotMatch(route,/\['active','trialing','past_due','unpaid','paused'\]\.includes\(sub\.status\)/);
 });
+
+test('checkout and portal preserve a trusted preview origin on return',()=>{
+  const checkoutStart=server.indexOf("app.post('/api/create-checkout-session'");
+  const portalStart=server.indexOf("app.post('/api/create-portal-session'",checkoutStart);
+  const routeEnd=server.indexOf("app.use('/api'",portalStart);
+  const checkoutRoute=checkoutStart>=0&&portalStart>checkoutStart?server.slice(checkoutStart,portalStart):'';
+  const portalRoute=portalStart>=0&&routeEnd>portalStart?server.slice(portalStart,routeEnd):'';
+  assert.match(checkoutRoute,/const billingOrigin=trustedRecoveryOrigin\(req\)/);
+  assert.match(checkoutRoute,/success_url:`\$\{billingOrigin\}\/\?billing=success/);
+  assert.match(checkoutRoute,/cancel_url:`\$\{billingOrigin\}\/\?billing=cancel`/);
+  assert.match(portalRoute,/const billingOrigin=trustedRecoveryOrigin\(req\)/);
+  assert.match(portalRoute,/return_url:billingOrigin/);
+});
