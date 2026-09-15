@@ -10,6 +10,7 @@ const $=s=>document.querySelector(s);
 const money=n=>new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(Number.isFinite(+n)?+n:0);
 const pct=n=>`${Number(n).toFixed(1)}%`;
 
+function setTextIfChanged(element,next){if(element&&element.textContent.trim()!==next)element.textContent=next}
 function patchPricing(){
   const rules=[
     ['#billingBtn','Upgrade · '+PRO_PRICE_BUTTON],
@@ -22,10 +23,10 @@ function patchPricing(){
     if(!button)continue;
     const text=button.textContent.trim();
     if(/manage billing|opening billing|opening checkout|saving|working/i.test(text))continue;
-    if(selector==='#upgradeNow'&&/create an account|create account/i.test(text))button.textContent=`Create account · Pro ${PRO_PRICE_BUTTON}`;
-    else if(/upgrade/i.test(text))button.textContent=label;
+    if(selector==='#upgradeNow'&&/create an account|create account/i.test(text))setTextIfChanged(button,`Create account · Pro ${PRO_PRICE_BUTTON}`);
+    else if(/upgrade/i.test(text))setTextIfChanged(button,label);
 
-    if(selector!=='#billingBtn'&&/\$19\/mo/.test(button.textContent)){
+    if(selector!=='#billingBtn'&&button.textContent.includes(PRO_PRICE_BUTTON)){
       const host=button.parentElement;
       if(host&&!host.querySelector(`[data-pro-price-note="${button.id}"]`)){
         const note=document.createElement('p');
