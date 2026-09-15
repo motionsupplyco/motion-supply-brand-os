@@ -11,6 +11,9 @@ function collectPageErrors(page){
   return errors;
 }
 function slug(value){return String(value).toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')}
+async function expectDrawerOffCanvas(page){
+  await expect.poll(async()=>page.locator('#side').evaluate(el=>Math.round(el.getBoundingClientRect().right)),{timeout:2000}).toBeLessThanOrEqual(1);
+}
 
 test('Foundry Eight demo opens the new founder workspaces without uncaught browser errors',async({page})=>{
   const errors=collectPageErrors(page);
@@ -54,6 +57,7 @@ test('mobile sidebar utilities and custom V2 navigation close the drawer after s
   await page.locator('#demoBtn').click();
   await expect(page.locator('#side')).not.toHaveClass(/\bopen\b/);
   await expect(page.locator('#menuBtn')).toHaveAttribute('aria-expanded','false');
+  await expectDrawerOffCanvas(page);
   await expect(page.locator('#planPill')).toContainText(/DEMO/);
 
   await page.locator('#menuBtn').click();
@@ -62,6 +66,7 @@ test('mobile sidebar utilities and custom V2 navigation close the drawer after s
   await expect(page.locator('#side')).not.toHaveClass(/\bopen\b/);
   await expect(page.locator('body')).not.toHaveClass(/\bmenuOpen\b/);
   await expect(page.locator('#menuBtn')).toHaveAttribute('aria-expanded','false');
+  await expectDrawerOffCanvas(page);
   await expect(page.locator('#title')).toHaveText('Cash Forecast');
   await expect(page.locator('#app .v2Hero').first()).toBeVisible();
   await page.screenshot({path:`${SHOTS}/mobile-cash-forecast.png`,fullPage:false});
