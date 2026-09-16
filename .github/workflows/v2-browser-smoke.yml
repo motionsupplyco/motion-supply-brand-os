@@ -6,13 +6,14 @@ on:
     paths:
       - 'public/**'
       - 'browser-tests/**'
+      - 'playwright.config.js'
       - '.github/workflows/v2-browser-smoke.yml'
   workflow_dispatch:
 
 jobs:
   browser-smoke:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 18
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -29,8 +30,8 @@ jobs:
       - name: Install pinned Playwright test runner
         run: npm install --no-save --package-lock=false @playwright/test@1.63.0
 
-      - name: Install Chromium
-        run: npx playwright install --with-deps chromium
+      - name: Install Chromium and WebKit
+        run: npx playwright install --with-deps chromium webkit
 
       - name: Start static release fixture
         run: |
@@ -45,14 +46,17 @@ jobs:
           cat /tmp/msbo-static.log
           exit 1
 
-      - name: Run accessibility interaction and preference smoke
-        run: npx playwright test browser-tests/v2-release-smoke.spec.js browser-tests/accessibility-preferences-smoke.spec.js --reporter=line
+      - name: Run full Chromium interaction and device QA
+        run: npx playwright test browser-tests/*.spec.js --project=chromium --reporter=line
+
+      - name: Run WebKit responsive device matrix
+        run: npx playwright test browser-tests/device-matrix-smoke.spec.js --project=webkit --reporter=line
 
       - name: Upload visual review screenshots
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: v2-browser-screenshots
-          path: artifacts/v2-browser/
+          path: artifacts/
           if-no-files-found: ignore
           retention-days: 3
