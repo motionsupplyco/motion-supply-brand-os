@@ -113,6 +113,28 @@ test('Brand Engine generates founder directions with official pre-screen steps a
   expect(errors,`uncaught browser errors: ${errors.join(' | ')}`).toEqual([]);
 });
 
+test('Brand Engine stays usable at 390×844 with wrapped USPTO queries and no horizontal overflow',async({page})=>{
+  const errors=collectPageErrors(page);
+  await page.setViewportSize({width:390,height:844});
+  await page.route('**/api/brand-engine/event',async route=>route.fulfill({status:200,contentType:'application/json',body:'{"ok":true}'}));
+  await page.goto(`${APP}brand-engine.html`,{waitUntil:'domcontentloaded'});
+  await page.locator('#seedWords').fill('ghost archive');
+  await page.locator('#vibe').selectOption('street');
+  await page.locator('#generateNames').click();
+  await expect(page.locator('.nameCard')).toHaveCount(12);
+  const first=page.locator('.nameCard').first();
+  await first.scrollIntoViewIfNeeded();
+  await expect(first).toBeVisible();
+  await expect(first.locator('.trademarkBlock')).toBeVisible();
+  await expect(first.locator('.trademarkQuery')).toHaveCount(2);
+  await expect(first.locator('.trademarkActions a')).toBeVisible();
+  await expect(first.locator('[data-use-name]')).toBeVisible();
+  await expect.poll(async()=>page.evaluate(()=>document.documentElement.scrollWidth-window.innerWidth),{timeout:2000}).toBeLessThanOrEqual(1);
+  await expect(first).not.toContainText(/AVAILABLE|TRADEMARK CLEAR|CLEARANCE SCORE/i);
+  await page.screenshot({path:`${SHOTS}/brand-engine-mobile.png`,fullPage:false});
+  expect(errors,`uncaught browser errors: ${errors.join(' | ')}`).toEqual([]);
+});
+
 test('Brand Engine handoff never creates a brand until the founder explicitly presses Initialize',async({page})=>{
   const errors=collectPageErrors(page),events=[];let brandPosts=0;
   await page.addInitScript(()=>{
