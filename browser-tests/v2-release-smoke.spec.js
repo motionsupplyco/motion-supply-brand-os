@@ -95,6 +95,8 @@ test('Brand Engine generates founder directions with official pre-screen steps a
   await page.locator('#generateNames').click();
   await expect(page.locator('.nameCard')).toHaveCount(12);
   const first=page.locator('.nameCard').first();
+  const initialFirstName=(await first.locator('h3').textContent())?.trim();
+  expect(initialFirstName).toBeTruthy();
   await expect(first.locator('.trademarkBlock')).toContainText('USPTO FEDERAL PRE-SCREEN');
   await expect(first.locator('.trademarkBlock')).toContainText('SCREENING ONLY');
   await expect(first.locator('.trademarkQuery').first().locator('code')).toContainText('CM:"');
@@ -104,7 +106,12 @@ test('Brand Engine generates founder directions with official pre-screen steps a
   await expect(first.locator('.domainStatus.registered')).toHaveText('REGISTERED');
   await expect(first.locator('.domainStatus.not_found')).toHaveText('NO RDAP RECORD');
   await expect(first).not.toContainText(/AVAILABLE|TRADEMARK CLEAR|CLEARANCE SCORE/i);
-  await expect.poll(()=>events.filter(event=>event.event_name==='brand_engine_names_generated').length).toBe(1);
+  await page.locator('#regenerate').click();
+  await expect(page.locator('.nameCard')).toHaveCount(12);
+  const regeneratedFirstName=(await page.locator('.nameCard').first().locator('h3').textContent())?.trim();
+  expect(regeneratedFirstName).toBeTruthy();
+  expect(regeneratedFirstName).not.toBe(initialFirstName);
+  await expect.poll(()=>events.filter(event=>event.event_name==='brand_engine_names_generated').length).toBe(2);
   await expect.poll(()=>events.filter(event=>event.event_name==='brand_engine_domain_checked').length).toBe(1);
   const analyticsText=JSON.stringify(events);
   expect(analyticsText).not.toMatch(/ghost archive|Ghost Dept|\.com|seed_words|brand_name|handles/i);
