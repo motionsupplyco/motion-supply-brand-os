@@ -186,3 +186,29 @@ test('Brand Engine handoff never creates a brand until the founder explicitly pr
   expect(JSON.stringify(events)).not.toContain('Ghost Dept');
   expect(errors,`uncaught browser errors: ${errors.join(' | ')}`).toEqual([]);
 });
+
+test('Brand Engine retries explicit initialization after refreshing an expired access token',async({page})=>{
+  const errors=collectPageErrors(page);let brandAttempts=0,refreshAttempts=0;const authHeaders=[];
+  await page.addInitScript(()=>localStorage.setItem('msbo_session',JSON.stringify({access_token:'stale-token',refresh_token:'refresh-token'})));
+  await page.route('**/api/brand-engine/event',async route=>route.fulfill({status:200,contentType:'application/json',body:'{"ok":true}'}));
+  await page.route('**/api/auth/refresh',async route=>{
+    refreshAttempts++;
+    await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({session:{access_token:'fresh-token',refresh_token:'rotated-refresh'}})});
+  });
+  await page.route('**/api/brands',async route=>{
+    if(route.request().method()!=='POST')return route.fulfill({status:200,contentType:'application/json',body:'{"brands":[]}'});
+    brandAttempts++;authHeaders.push(route.request().headers()['authorization']||'');
+    if(brandAttempts===1)return route.fulfill({status:401,contentType:'application/json',body:'{"error":"Unauthorized"}'});
+    await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({brand:{id:'00000000-0000-4000-8000-000000000002',name:'Refreshed Brand'}})});
+  });
+  await page.goto(`${APP}brand-engine.html`,{waitUntil:'domcontentloaded'});
+  const first=page.locator('.nameCard').first();
+  await first.locator('[data-use-name]').click();
+  await expect.poll(()=>refreshAttempts).toBe(1);
+  await expect.poll(()=>brandAttempts).toBe(2);
+  expect(authHeaders).toEqual(['Bearer stale-token','Bearer fresh-token']);
+  const stored=await page.evaluate(()=>JSON.parse(localStorage.getItem('msbo_session')||'null'));
+  expect(stored?.access_token).toBe('fresh-token');
+  expect(stored?.refresh_token).toBe('rotated-refresh');
+  expect(errors,`uncaught browser errors: ${errors.join(' | ')}`).toEqual([]);
+});
