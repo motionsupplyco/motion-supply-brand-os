@@ -108,7 +108,10 @@ test('mobile drawer remains dismissible across narrow phone and tablet widths',a
 
     await page.locator('#menuBtn').click();
     await expect(side).toHaveClass(/\bopen\b/);
-    await page.locator('#menuBackdrop').click({position:{x:10,y:10}});
+    const backdrop=page.locator('#menuBackdrop');
+    const backdropBox=await backdrop.boundingBox();
+    expect(backdropBox).not.toBeNull();
+    await page.mouse.click(backdropBox.x+backdropBox.width-10,backdropBox.y+10);
     await expect(side).not.toHaveClass(/\bopen\b/);
 
     await page.locator('#menuBtn').click();
