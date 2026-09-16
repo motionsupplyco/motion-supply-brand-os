@@ -4,7 +4,20 @@ Last audited: 2026-09-16
 
 ## Current monitoring posture
 
-Brand OS runs on Vercel Pro. Vercel runtime logs provide structured request dimensions including status code, path/route, deployment, environment and request identifiers. The application also sends an `X-Request-Id` response header, using an incoming request ID when supplied or generating a UUID otherwise.
+Brand OS runs on Vercel Pro. Vercel runtime logs provide structured platform dimensions including status code, path/route, deployment, environment and request identifiers. The application also sends an `X-Request-Id` response header, using an incoming request ID when supplied or generating a UUID otherwise.
+
+This branch additionally emits one bounded JSON `http_request` record when an API response finishes. The application record contains only:
+
+- UTC timestamp
+- log level derived from HTTP status
+- event name (`http_request`)
+- request ID
+- HTTP method
+- normalized route template
+- status code
+- duration in milliseconds
+
+The application request logger does not read or serialize request bodies, query strings, IP addresses, cookies, authorization headers, email addresses, access tokens, reset tokens or provider payloads. Dynamic route values are represented by route templates, and unmatched API paths are normalized to `/api/:unmatched` rather than logging the raw path.
 
 At the time of this audit:
 
@@ -16,7 +29,7 @@ This document is an operational procedure, not a claim that every alert channel 
 
 ## External uptime check
 
-`.github/workflows/production-health-monitor.yml` runs from GitHub-hosted infrastructure every 15 minutes and can also be started manually.
+`.github/workflows/production-health-monitor.yml` runs from GitHub-hosted infrastructure every 15 minutes and can also be started manually after the workflow is merged to the default branch.
 
 It verifies two independent production surfaces:
 
@@ -47,26 +60,29 @@ Review in this order:
 2. What was the first/last seen timestamp?
 3. Which route and deployment produced it?
 4. Is the status expected product behavior (`401`, `402`, a deliberate validation `400`) or a real failure?
-5. Can the request be correlated by Vercel request ID / the app's `X-Request-Id`?
+5. Can the request be correlated by the app `request_id`, the `X-Request-Id` response header and Vercel request metadata?
 6. Did the same class continue after the supposed fix was deployed?
 
 Do not declare an incident resolved solely because a code change merged. Verify that recent production error/log windows are clean after the deployment is serving traffic.
 
 ## Structured logging boundary
 
-Use platform structured fields for request-level dimensions instead of embedding customer data in log messages. Application logs should be safe to retain and search.
+Application API completion logs are intentionally allowlisted rather than produced by serializing request objects. Use the JSON `http_request` line for request-level correlation and Vercel platform fields for deployment/environment context.
 
 Never log:
 
 - passwords, password hashes or reset tokens
 - bearer/access/refresh tokens
+- cookies or authorization headers
+- IP addresses when they are not specifically required for a security investigation
 - Stripe secret keys, webhook secrets or full payment objects
 - Supabase service-role/secret keys
 - Shopify access/refresh tokens or OAuth secrets
 - raw database connection strings
+- raw query strings
 - full request bodies from authenticated/customer routes
 
-When logging a provider failure, prefer a small safe set such as event name, provider error type/code, HTTP status and request/correlation ID. Existing legacy console errors should be treated as an area to normalize when their code paths are next touched; Vercel's structured request metadata remains the primary correlation layer today.
+When logging a provider failure, prefer a small safe set such as event name, provider error type/code, HTTP status and request/correlation ID. Existing legacy console errors should still be normalized when their code paths are next touched; the new request-completion record does not make arbitrary legacy error objects safe to log.
 
 ## What counts as an outage
 
@@ -103,13 +119,14 @@ Do not paste secret-bearing raw provider payloads into GitHub issues.
 
 ## Launch-gate status
 
-This tranche provides a repeatable external uptime check and a production observability procedure on top of Vercel's runtime error/log system and Brand OS request IDs.
+This tranche provides application-emitted structured API completion logs, a repeatable external uptime check and a production observability procedure on top of Vercel's runtime error/log system and Brand OS request IDs.
 
 The P0 **Error + uptime monitoring and structured logs** checkbox should remain unchecked until:
 
-- this workflow/runbook is merged to the default branch so the scheduled monitor can actually run,
+- this branch is intentionally merged to the default branch so the request logger and scheduled monitor are serving production,
 - at least one scheduled or manual production-health run succeeds from the merged workflow,
-- alert delivery for a deliberately failed or otherwise controlled test is confirmed to reach the responsible operator, and
+- alert delivery for a deliberately failed or otherwise controlled test is confirmed to reach the responsible operator,
+- a current production log review confirms `http_request` JSON lines are arriving with only the documented allowlisted fields, and
 - a current production log review shows no unresolved critical runtime-error cluster.
 
-Do not mark the gate complete from code review alone.
+Do not mark the gate complete from preview/code review alone.
