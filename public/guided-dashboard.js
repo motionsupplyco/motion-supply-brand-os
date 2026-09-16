@@ -89,11 +89,10 @@ function dashboardVisible(){
 function renderGuidedLoop(){
   if(!dashboardVisible())return;
   const app=$('#app');
-  if(!app)return;
-  const intro=app.querySelector('.dashboardIntro');
-  if(!intro)return;
-  if(app.querySelector('#guidedOperatingLoop'))return;
-  intro.insertAdjacentHTML('afterend',loopMarkup());
+  if(!app||app.querySelector('#guidedOperatingLoop'))return;
+  const anchor=app.querySelector('.dashboardIntro')||app.querySelector('.onboard');
+  if(!anchor)return;
+  anchor.insertAdjacentHTML('afterend',loopMarkup());
 }
 
 function routeTo(selector){
