@@ -1,0 +1,34 @@
+.skipLink{
+  position:fixed;
+  left:12px;
+  top:12px;
+  z-index:1000;
+  transform:translateY(-160%);
+  background:#fff;
+  color:#111318;
+  border:2px solid #111318;
+  border-radius:8px;
+  padding:10px 12px;
+  font-weight:800;
+  text-decoration:none;
+}
+.skipLink:focus{transform:translateY(0)}
+
+:where(button,a,input,select,textarea,summary,[role="button"]):focus-visible{
+  outline:3px solid #b78a34;
+  outline-offset:3px;
+}
+
+.actioncard[role="button"]{
+  text-align:left;
+  color:inherit;
+}
+
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{
+    scroll-behavior:auto!important;
+    animation-duration:.01ms!important;
+    animation-iteration-count:1!important;
+    transition-duration:.01ms!important;
+  }
+}
