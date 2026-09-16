@@ -28,10 +28,10 @@ test('social handle candidates stay within common platform length boundaries',()
   assert.equal(new Set(handles).size,handles.length);
 });
 
-test('USPTO pre-screen plan gives official manual search steps without a clearance verdict',()=>{
+test('USPTO pre-screen plan follows field-tag casing guidance without a clearance verdict',()=>{
   const plan=trademarkSearchPlan('Ghost Dept');
   assert.equal(plan.officialUrl,BRAND_ENGINE_USPTO_SEARCH_URL);
-  assert.equal(plan.exactQuery,'CM:"Ghost Dept"');
+  assert.equal(plan.exactQuery,'CM:"ghost dept"');
   assert.equal(plan.expandedQuery,'CM:(/.*ghost.*/ AND /.*dept.*/)');
   assert.ok(plan.guidance.some(step=>/alternative spellings, pronunciations/i.test(step)));
   assert.ok(plan.guidance.some(step=>/Class 025 alone/i.test(step)));
@@ -39,9 +39,9 @@ test('USPTO pre-screen plan gives official manual search steps without a clearan
   assert.doesNotMatch(JSON.stringify(plan),/trademark clear|clearance score|registration probability/i);
 });
 
-test('USPTO pre-screen safely builds expanded queries from punctuation-heavy names',()=>{
+test('USPTO pre-screen safely lowercases punctuation-heavy exact and expanded terms',()=>{
   const plan=trademarkSearchPlan("A/B Works 99");
-  assert.equal(plan.exactQuery,'CM:"A/b Works 99"');
+  assert.equal(plan.exactQuery,'CM:"a/b works 99"');
   assert.equal(plan.expandedQuery,'CM:(/.*a.*/ AND /.*b.*/ AND /.*works.*/ AND /.*99.*/)');
 });
 
