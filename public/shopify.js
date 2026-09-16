@@ -2,24 +2,65 @@
 // Transaction history export. Parsing occurs in the browser; raw customer rows
 // do not need to leave the user's device.
 
+const csvError = message => new Error(`Invalid CSV: ${message}`);
+
 export function parseCsv(text) {
   const rows = [];
-  let row = [], field = '', quoted = false;
+  let row = [], field = '', quoted = false, quoteClosed = false;
   const input = String(text ?? '').replace(/^\uFEFF/, '');
+
+  const pushField = () => {
+    row.push(field);
+    field = '';
+    quoteClosed = false;
+  };
+  const pushRow = () => {
+    pushField();
+    rows.push(row);
+    row = [];
+  };
+
   for (let i = 0; i < input.length; i++) {
     const c = input[i];
+
     if (quoted) {
-      if (c === '"' && input[i + 1] === '"') { field += '"'; i++; }
-      else if (c === '"') quoted = false;
-      else field += c;
+      if (c === '"' && input[i + 1] === '"') {
+        field += '"';
+        i++;
+      } else if (c === '"') {
+        quoted = false;
+        quoteClosed = true;
+      } else {
+        field += c;
+      }
+      continue;
+    }
+
+    if (quoteClosed) {
+      if (c === ',') pushField();
+      else if (c === '\n') pushRow();
+      else if (c === '\r' && input[i + 1] === '\n') { pushRow(); i++; }
+      else throw csvError('unexpected characters after a closing quote.');
+      continue;
+    }
+
+    if (c === '"') {
+      if (field.length) throw csvError('a quote appeared inside an unquoted field.');
+      quoted = true;
+    } else if (c === ',') {
+      pushField();
+    } else if (c === '\n') {
+      pushRow();
+    } else if (c === '\r' && input[i + 1] === '\n') {
+      pushRow();
+      i++;
     } else {
-      if (c === '"') quoted = true;
-      else if (c === ',') { row.push(field); field = ''; }
-      else if (c === '\n') { row.push(field.replace(/\r$/, '')); rows.push(row); row = []; field = ''; }
-      else field += c;
+      field += c;
     }
   }
-  if (field.length || row.length) { row.push(field.replace(/\r$/, '')); rows.push(row); }
+
+  if (quoted) throw csvError('an unterminated quoted field was found.');
+  if (field.length || row.length || quoteClosed) pushRow();
   return rows.filter(r => r.some(v => String(v).trim() !== ''));
 }
 
@@ -27,16 +68,28 @@ export function csvObjects(text) {
   const rows = parseCsv(text);
   if (!rows.length) return [];
   const headers = rows[0].map(h => String(h).trim());
+  if (headers.some(h => !h)) throw csvError('a blank column header was found.');
+  const seen = new Set();
+  for (const header of headers) {
+    if (seen.has(header)) throw csvError(`duplicate column header "${header}".`);
+    seen.add(header);
+  }
   return rows.slice(1).map(cols => Object.fromEntries(headers.map((h, i) => [h, cols[i] ?? ''])));
 }
 
 const money = (v) => {
-  const x = Number(String(v ?? '').replace(/[$,]/g, '').trim());
-  return Number.isFinite(x) ? x : 0;
+  const raw = String(v ?? '').trim();
+  if (!raw) return 0;
+  const x = Number(raw.replace(/[$,]/g, ''));
+  if (!Number.isFinite(x)) throw csvError(`non-numeric money value "${raw}".`);
+  return x;
 };
 const qty = (v) => {
-  const x = Number(v);
-  return Number.isFinite(x) ? x : 0;
+  const raw = String(v ?? '').trim();
+  if (!raw) return 0;
+  const x = Number(raw);
+  if (!Number.isFinite(x)) throw csvError(`non-numeric quantity value "${raw}".`);
+  return x;
 };
 
 export function detectShopifyCsv(rows) {
