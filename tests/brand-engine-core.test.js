@@ -53,6 +53,17 @@ test('name generation is deterministic for the same founder input',()=>{
   assert.ok(a.every(item=>item.name&&item.trademark?.officialUrl===BRAND_ENGINE_USPTO_SEARCH_URL&&item.domains.length===3&&item.handles.length>0));
 });
 
+test('regeneration variations stay deterministic but produce a meaningfully different name set',()=>{
+  const base=generateBrandNames({seedWords:'void ghost',vibe:'street',count:12,variation:0});
+  const first=generateBrandNames({seedWords:'void ghost',vibe:'street',count:12,variation:1});
+  const firstAgain=generateBrandNames({seedWords:'void ghost',vibe:'street',count:12,variation:1});
+  const second=generateBrandNames({seedWords:'void ghost',vibe:'street',count:12,variation:2});
+  assert.deepEqual(first,firstAgain,'a specific regeneration variation must stay reproducible');
+  assert.notDeepEqual(first.map(item=>item.name),base.map(item=>item.name),'Regenerate must not return the original list');
+  assert.notDeepEqual(second.map(item=>item.name),first.map(item=>item.name),'successive Regenerate clicks should advance to another list');
+  assert.equal(new Set(first.map(item=>item.name)).size,first.length);
+});
+
 test('name profile gives observable fit notes instead of a fake quality score',()=>{
   const profile=brandNameProfile('Extremely Long Clothing Brand Company 99');
   assert.equal(profile.words,6);
