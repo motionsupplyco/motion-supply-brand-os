@@ -7,6 +7,7 @@ const esc=value=>String(value??'').replace(/[&<>\'\"]/g,char=>({'&':'&amp;','<':
 const loadSession=()=>{try{return JSON.parse(localStorage.getItem('msbo_session')||'null')}catch{return null}};
 const entrypoint=()=>new URLSearchParams(location.search).get('src')==='sidebar'?'sidebar':'standalone';
 let currentNames=[];
+let generationVariation=0;
 
 function toast(message,tone='neutral'){
   const el=$('#engineToast');if(!el)return;el.textContent=message;el.className=`engineToast ${tone} show`;clearTimeout(toast.timer);toast.timer=setTimeout(()=>el.classList.remove('show'),2600);
@@ -15,11 +16,11 @@ function copyText(value,success='Copied ✓'){
   if(!navigator.clipboard?.writeText)return toast('Copy is not available in this browser. Select the text manually.','warn');
   navigator.clipboard.writeText(String(value||'')).then(()=>toast(success,'good')).catch(()=>toast('Could not copy automatically.','warn'));
 }
-function generate({track=true}={}){
+function generate({track=true,variation=generationVariation}={}){
   const seedWords=$('#seedWords')?.value||'';
   const vibe=$('#vibe')?.value||'street';
   const count=Number($('#nameCount')?.value)||12;
-  currentNames=generateBrandNames({seedWords,vibe,count});
+  currentNames=generateBrandNames({seedWords,vibe,count,variation});
   renderNames();
   if(track)trackBrandEngine('brand_engine_names_generated',{vibe,count:currentNames.length,entrypoint:entrypoint()});
 }
@@ -106,15 +107,16 @@ async function initializeBrand(index){
 }
 
 document.addEventListener('click',event=>{
-  if(event.target.closest('#generateNames')||event.target.closest('#regenerate')){generate();return}
+  if(event.target.closest('#generateNames')){generationVariation=0;generate({variation:generationVariation});return}
+  if(event.target.closest('#regenerate')){generationVariation+=1;generate({variation:generationVariation});return}
   const domainButton=event.target.closest('[data-check-domains]');if(domainButton){checkDomains(Number(domainButton.dataset.checkDomains));return}
   const trademarkButton=event.target.closest('[data-copy-trademark]');if(trademarkButton){const item=currentNames[Number(trademarkButton.dataset.copyTrademark)];const plan=item?.trademark||trademarkSearchPlan(item?.name);if(plan){const value=trademarkButton.dataset.trademarkQuery==='expanded'?plan.expandedQuery:plan.exactQuery;copyText(value,'USPTO search query copied ✓')}return}
   const useButton=event.target.closest('[data-use-name]');if(useButton){initializeBrand(Number(useButton.dataset.useName));return}
   const copyButton=event.target.closest('[data-copy-name]');if(copyButton){const item=currentNames[Number(copyButton.dataset.copyName)];if(item)copyText(item.name,'Name copied ✓');return}
 });
 
-document.addEventListener('keydown',event=>{if(event.key==='Enter'&&event.target.closest('.engineForm')){event.preventDefault();generate()}});
+document.addEventListener('keydown',event=>{if(event.key==='Enter'&&event.target.closest('.engineForm')){event.preventDefault();generationVariation=0;generate({variation:generationVariation})}});
 
 trackBrandEngine('brand_engine_viewed',{entrypoint:entrypoint()});
 $('#seedWords').value='void archive motion';
-generate({track:false});
+generate({track:false,variation:0});
