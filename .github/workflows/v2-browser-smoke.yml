@@ -45,8 +45,8 @@ jobs:
           cat /tmp/msbo-static.log
           exit 1
 
-      - name: Run V2 interaction smoke
-        run: npx playwright test browser-tests/v2-release-smoke.spec.js --reporter=line
+      - name: Run browser interaction smoke
+        run: npx playwright test browser-tests --reporter=line
 
       - name: Upload visual review screenshots
         if: always()

@@ -8,13 +8,18 @@ test('beginner guide is modal and isolates the application while open',()=>{
   assert.match(help,/role=\"dialog\" aria-modal=\"true\" aria-labelledby=\"helpTitle\"/);
   assert.match(help,/shell\.inert=true/);
   assert.match(help,/shell\.inert=false/);
-  assert.match(help,/helpReturnFocus=document\.activeElement/);
+  assert.match(help,/helpReturnFocus=resolveHelpReturnFocus\(context\)/);
+  assert.match(help,/helpReturnFocusCandidate\(document\.activeElement\)/);
 });
 
-test('beginner guide supports Escape, Tab trapping, and focus restoration',()=>{
+test('beginner guide supports Escape, Tab trapping, and safe focus restoration',()=>{
   assert.match(help,/e\.key==='Escape'/);
   assert.match(help,/e\.key!=='Tab'/);
   assert.match(help,/e\.shiftKey/);
+  assert.match(help,/returnFocusSelectors/);
+  assert.match(help,/getBoundingClientRect\(\)/);
+  assert.match(help,/target\.closest\('\[inert\]'\)/);
+  assert.match(help,/target\?\.isConnected/);
   assert.match(help,/target\.focus\(\{preventScroll:true\}\)/);
   assert.match(help,/closeHelp\(\{restoreFocus:false\}\)/);
 });
