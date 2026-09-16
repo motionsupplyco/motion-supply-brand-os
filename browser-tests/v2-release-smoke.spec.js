@@ -73,3 +73,36 @@ test('mobile sidebar utilities and custom V2 navigation close the drawer after s
 
   expect(errors,`uncaught browser errors: ${errors.join(' | ')}`).toEqual([]);
 });
+
+test('Shopify CSV import rejects malformed input without saving it and accepts a valid export-shaped file',async({page})=>{
+  const errors=collectPageErrors(page);
+  const dialogs=[];
+  page.on('dialog',async dialog=>{dialogs.push(dialog.message());await dialog.accept()});
+  await page.setViewportSize({width:1440,height:1000});
+  await page.goto(APP,{waitUntil:'domcontentloaded'});
+  await page.locator('#demoBtn').click();
+  await page.locator('[data-view="shopify"]').click();
+  await expect(page.locator('#title')).toHaveText('Shopify CSV Dashboard');
+  await expect(page.locator('#app')).toContainText('No store data imported.');
+
+  await page.locator('#csvFile').setInputFiles({
+    name:'malformed-orders.csv',
+    mimeType:'text/csv',
+    buffer:Buffer.from('Name,Total,Lineitem quantity,Lineitem price\n#1,"never closes,1,10')
+  });
+  await expect.poll(()=>dialogs.some(message=>/Invalid CSV: an unterminated quoted field/i.test(message))).toBe(true);
+  await expect(page.locator('#clearImport')).toHaveCount(0);
+  await expect(page.locator('#app')).toContainText('No store data imported.');
+
+  await page.locator('#csvFile').setInputFiles({
+    name:'valid-orders.csv',
+    mimeType:'text/csv',
+    buffer:Buffer.from('\uFEFFName,Email,Financial Status,Fulfillment Status,Subtotal,Shipping,Taxes,Total,Discount Amount,Created at,Lineitem quantity,Lineitem name,Lineitem price,Lineitem SKU,Canceled at\r\n#5001,test@example.com,paid,fulfilled,50,0,0,50,0,2026-09-16 10:00:00 -0400,1,"Heavyweight Tee, Black",50,TEE-BLK,\r\n')
+  });
+  await expect(page.locator('#clearImport')).toBeVisible();
+  await expect(page.locator('#app')).toContainText('1');
+  await expect(page.locator('#app')).toContainText('$50.00');
+  await page.screenshot({path:`${SHOTS}/desktop-shopify-csv-import.png`,fullPage:false});
+
+  expect(errors,`uncaught browser errors: ${errors.join(' | ')}`).toEqual([]);
+});
