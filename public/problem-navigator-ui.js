@@ -33,10 +33,26 @@ function openAction(action){
   });
 }
 
+function openProblemHelp(button){
+  const view=String(button?.dataset.problemHelpView||'');
+  const term=String(button?.dataset.problemHelpTerm||'');
+  closeNavigator();
+  requestAnimationFrame(()=>{
+    if(typeof window.msboOpenHelp==='function')window.msboOpenHelp({view,term});
+    else $('#learnBtn')?.click();
+  });
+}
+
 document.addEventListener('click',event=>{
   if(event.target.closest('#problemNav')){
     event.preventDefault();
     openNavigator();
+    return;
+  }
+  const help=event.target.closest('[data-problem-help-view]');
+  if(help){
+    event.preventDefault();
+    openProblemHelp(help);
     return;
   }
   const action=event.target.closest('[data-problem-action]');
