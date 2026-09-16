@@ -76,7 +76,7 @@ const PROBLEMS=[
   }
 ];
 
-const esc=value=>String(value??'').replace(/[&<>\'\"]/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt',"'":'&#39;','"':'&quot;'}[char]));
+const esc=value=>String(value??'').replace(/[&<>\'\"]/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char]));
 
 export function problemNavigatorTarget(action){return ACTION_TARGETS[String(action||'')]||null}
 
