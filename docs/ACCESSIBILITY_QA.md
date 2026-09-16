@@ -40,7 +40,7 @@ The audit identified these failures on the pre-change app:
 
 ## Automated browser acceptance
 
-The browser smoke must prove at minimum:
+The primary keyboard/browser smoke proves at minimum:
 
 - skip link exists and moves focus to main content;
 - active navigation exposes `aria-current="page"`;
@@ -49,6 +49,14 @@ The browser smoke must prove at minimum:
 - a generated calculator input has an ID with a corresponding `<label for>`;
 - Shopify file input has an accessible name;
 - no uncaught browser error is produced by the accessibility layer.
+
+The preference/reflow stress smoke additionally proves:
+
+- `prefers-reduced-motion: reduce` is actually applied by the rendered browser, collapsing shared transition and animation durations and disabling smooth scrolling;
+- representative dashboard/form flows remain usable without document-level horizontal overflow at 640 CSS px and 320 CSS px widths;
+- a 200% root-text enlargement stress keeps the mobile navigation and Profit & Pricing input reachable without document-level horizontal overflow.
+
+These automated narrow-width and text-enlargement checks are **stress tests**, not claims that CI literally reproduces browser zoom, OS Dynamic Type/text scaling, or assistive technology behavior.
 
 Existing mobile-navigation and modal focus-trap tests remain part of the release suite and must stay green.
 
@@ -59,8 +67,8 @@ Automated Chromium checks do not prove the full assistive-technology experience.
 1. **Keyboard only — desktop:** Tab/Shift+Tab through shell, navigation, forms, dialogs, details/summary controls and destructive actions; no keyboard trap except intentional modal trapping.
 2. **Keyboard only — mobile-width layout:** open/close drawer, move through controls, close with Escape, and confirm focus returns to the visible trigger.
 3. **Screen reader:** at least one supported desktop or mobile screen reader (for example VoiceOver or NVDA) reads route title, current navigation item, form labels/help, dialog name/status messages, tables and validation/error feedback coherently.
-4. **Zoom/reflow:** browser zoom at 200% and 400% on representative dashboard/form views without loss of functionality or required two-dimensional scrolling for ordinary content.
-5. **Reduced motion:** OS/browser reduced-motion preference produces no meaningful motion dependency.
+4. **Zoom/reflow:** real browser zoom at 200% and 400% on representative dashboard/form views without loss of functionality or required two-dimensional scrolling for ordinary content.
+5. **Reduced motion:** confirm on an actual OS/browser reduced-motion setting that no meaningful workflow depends on motion.
 6. **Contrast/meaning:** important status information remains understandable without relying on color alone and interactive focus remains visible against its background.
 7. **Signup/account recovery:** email/password controls, status messages, recovery, and account deletion can be completed and understood with keyboard/screen-reader navigation.
 
@@ -68,4 +76,4 @@ Record non-sensitive evidence (browser/device, assistive technology/version, vie
 
 ## Gate interpretation
 
-This tranche fixes and regression-locks the concrete automated accessibility failures found in the current app. It does **not** relabel an automated DOM/keyboard smoke as a complete human assistive-technology audit.
+This tranche fixes and regression-locks the concrete automated accessibility failures found in the current app and adds browser-executed reduced-motion/reflow/text-enlargement stress coverage. It does **not** relabel automated DOM/keyboard/layout checks as a complete human assistive-technology audit.
