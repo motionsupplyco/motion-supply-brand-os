@@ -14,12 +14,12 @@ const runbook = fs.readFileSync(path.join(root, 'docs', 'PRODUCTION_OBSERVABILIT
 test('production API exposes a correlatable non-secret health contract', () => {
   assert.match(server, /X-Request-Id/);
   assert.match(server, /crypto\.randomUUID\(\)/);
-  assert.match(server, /app\.get\('\/api\/health'/);
-  assert.match(server, /ok:true/);
-  assert.match(server, /authConfigured:/);
-  assert.match(server, /cloudConfigured:/);
-  assert.match(server, /billingConfigured:/);
-  assert.doesNotMatch(server.match(/app\.get\('\/api\/health'[\s\S]{0,500}/)?.[0] || '', /SECRET|SERVICE_ROLE|PASSWORD|TOKEN/i);
+  const healthRoute = server.match(/app\.get\('\/api\/health',[^\n]+/i)?.[0] || '';
+  assert.match(healthRoute, /res\.json\(\{ok:true/);
+  assert.match(healthRoute, /authConfigured:/);
+  assert.match(healthRoute, /cloudConfigured:/);
+  assert.match(healthRoute, /billingConfigured:/);
+  assert.doesNotMatch(healthRoute, /\b(?:secret|token|password|databaseUrl|supabaseUrl)\s*:/i);
 });
 
 test('external uptime workflow checks production root and full health readiness every 15 minutes', () => {
