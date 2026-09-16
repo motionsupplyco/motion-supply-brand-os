@@ -1,0 +1,38 @@
+name: One-time full-stack integration merge
+
+on:
+  push:
+    branches: [full-stack-integration-candidate]
+
+permissions:
+  contents: write
+
+jobs:
+  integrate:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout combined P0 candidate
+        uses: actions/checkout@v7
+        with:
+          ref: full-stack-integration-candidate
+          fetch-depth: 0
+      - name: Merge full V3 and UX stack
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin ux-advisor-action-resources
+          if ! git merge --no-ff --no-edit origin/ux-advisor-action-resources; then
+            echo "::error::Full-stack integration conflict"
+            echo "Conflicting files:"
+            git diff --name-only --diff-filter=U
+            echo "Status:"
+            git status --short
+            exit 1
+          fi
+          git status --short
+          git log --oneline --decorate -16
+      - name: Push disposable integration candidate
+        run: git push origin HEAD:full-stack-integration-candidate
