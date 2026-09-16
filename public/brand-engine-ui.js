@@ -5,6 +5,7 @@ const $=selector=>document.querySelector(selector);
 const $$=selector=>[...document.querySelectorAll(selector)];
 const esc=value=>String(value??'').replace(/[&<>\'\"]/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char]));
 const loadSession=()=>{try{return JSON.parse(localStorage.getItem('msbo_session')||'null')}catch{return null}};
+const saveSession=session=>{if(session?.access_token)localStorage.setItem('msbo_session',JSON.stringify(session));else localStorage.removeItem('msbo_session')};
 const entrypoint=()=>new URLSearchParams(location.search).get('src')==='sidebar'?'sidebar':'standalone';
 let currentNames=[];
 let generationVariation=0;
@@ -89,6 +90,19 @@ async function checkDomains(index){
   }catch(error){toast(error.message||'Domain status could not be checked.','bad')}
   finally{if(button){button.disabled=false;button.textContent='Check 3 domains'}}
 }
+async function createBrandWithRefresh(name,initialSession){
+  let session=initialSession;
+  const post=()=>fetch('/api/brands',{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${session.access_token}`},body:JSON.stringify({name})});
+  let response=await post();
+  if(response.status===401&&session?.refresh_token){
+    const refresh=await fetch('/api/auth/refresh',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({refresh_token:session.refresh_token})});
+    if(refresh.ok){
+      const payload=await refresh.json().catch(()=>({}));
+      if(payload.session?.access_token){session=payload.session;saveSession(session);response=await post()}
+    }
+  }
+  return {response,payload:await response.json().catch(()=>({})),session};
+}
 async function initializeBrand(index){
   const item=currentNames[index];if(!item)return;
   localStorage.setItem('msbo_pending_brand_name',item.name);
@@ -96,8 +110,12 @@ async function initializeBrand(index){
   trackBrandEngine('brand_engine_handoff_started',{signed_in:Boolean(session?.access_token),entrypoint:entrypoint()});
   if(!session?.access_token){toast('Name saved. Create or sign in to your Brand OS account to initialize it.','good');setTimeout(()=>{location.href=`/?brandEngineName=${encodeURIComponent(item.name)}`},700);return}
   try{
-    const response=await fetch('/api/brands',{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${session.access_token}`},body:JSON.stringify({name:item.name})});
-    const payload=await response.json().catch(()=>({}));
+    const {response,payload}=await createBrandWithRefresh(item.name,session);
+    if(response.status===401){
+      saveSession(null);
+      toast('Your session expired. The name is still saved—sign in again in Brand OS to initialize it.','warn');
+      setTimeout(()=>{location.href=`/?brandEngineName=${encodeURIComponent(item.name)}`},900);return
+    }
     if(response.status===402){toast('Your free brand slot is already used. Open Brand OS to choose what to do next.','warn');setTimeout(()=>{location.href='/'},900);return}
     if(!response.ok)throw new Error(payload.error||'Brand could not be initialized.');
     localStorage.removeItem('msbo_pending_brand_name');
