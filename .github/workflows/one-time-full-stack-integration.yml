@@ -19,7 +19,7 @@ jobs:
           ref: full-stack-integration-candidate
           fetch-depth: 0
 
-      - name: Merge V3 UX stack with explicit additive resolutions
+      - name: Merge V3 UX stack without workflow-file mutations
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
@@ -29,25 +29,20 @@ jobs:
           git show HEAD:browser-tests/v2-release-smoke.spec.js > /tmp/p0-v2-release-smoke.spec.js
 
           if git merge --no-ff --no-edit origin/ux-advisor-action-resources; then
-            echo "::error::Expected the known three-file integration conflict, but merge completed cleanly; refusing to apply stale resolution logic."
+            echo "::error::Expected the known three-file integration conflict, but merge completed cleanly; refusing stale resolution logic."
             exit 1
           fi
 
           actual="$(git diff --name-only --diff-filter=U | sort)"
           expected="$(printf '%s\n' '.github/workflows/v2-browser-smoke.yml' 'browser-tests/v2-release-smoke.spec.js' 'public/index.html' | sort)"
-          if [ "$actual" != "$expected" ]; then
-            echo "::error::Unexpected conflict set"
-            echo "Expected:"
-            printf '%s\n' "$expected"
-            echo "Actual:"
-            printf '%s\n' "$actual"
-            exit 1
-          fi
+          [ "$actual" = "$expected" ] || { echo "::error::Unexpected conflict set"; printf 'Expected:\n%s\nActual:\n%s\n' "$expected" "$actual"; exit 1; }
 
-          # P0 workflow is the strict superset: all Chromium specs + WebKit device matrix.
+          # Keep workflow files unchanged for the Actions-token push. The connected
+          # GitHub write path will apply the test.yml union after this merge lands.
           git checkout --ours .github/workflows/v2-browser-smoke.yml
+          git checkout HEAD -- .github/workflows/test.yml
 
-          # UX/V3 smoke contains Brand Engine coverage. Append only the two P0-only tests.
+          # Preserve all UX/V3 release smoke and append only the two P0-only cases.
           git checkout --theirs browser-tests/v2-release-smoke.spec.js
           node <<'NODE'
           const fs=require('fs');
@@ -59,11 +54,10 @@ jobs:
           const start=ours.indexOf(marker);
           if(start<0 || ours.indexOf(keyboard,start)<0) throw new Error('P0-only smoke anchors missing');
           if(target.includes(marker) || target.includes(keyboard)) throw new Error('P0-only smoke already present in UX file');
-          const p0Only=ours.slice(start).trim();
-          fs.writeFileSync(targetPath,`${target}\n\n${p0Only}\n`);
+          fs.writeFileSync(targetPath,`${target}\n\n${ours.slice(start).trim()}\n`);
           NODE
 
-          # UX/V3 index owns the new product surfaces. Add the P0 accessibility layer once.
+          # Preserve UX/V3 app shell and mount P0 accessibility assets once.
           git checkout --theirs public/index.html
           node <<'NODE'
           const fs=require('fs');
@@ -77,13 +71,8 @@ jobs:
           fs.writeFileSync(path,html);
           NODE
 
-          git add .github/workflows/v2-browser-smoke.yml browser-tests/v2-release-smoke.spec.js public/index.html
-
-          if [ -n "$(git diff --name-only --diff-filter=U)" ]; then
-            echo "::error::Unresolved merge conflicts remain"
-            git diff --name-only --diff-filter=U
-            exit 1
-          fi
+          git add .github/workflows/test.yml .github/workflows/v2-browser-smoke.yml browser-tests/v2-release-smoke.spec.js public/index.html
+          [ -z "$(git diff --name-only --diff-filter=U)" ] || { echo "::error::Unresolved conflicts remain"; exit 1; }
 
           test "$(grep -Fc 'accessibility.css' public/index.html)" -eq 1
           test "$(grep -Fc 'accessibility.js' public/index.html)" -eq 1
@@ -95,6 +84,9 @@ jobs:
           grep -Fq 'browser-tests/*.spec.js --project=chromium' .github/workflows/v2-browser-smoke.yml
           grep -Fq 'device-matrix-smoke.spec.js --project=webkit' .github/workflows/v2-browser-smoke.yml
           git diff --check
+
+          # The merge itself must not alter existing workflow files.
+          git diff --quiet HEAD -- .github/workflows/test.yml .github/workflows/v2-browser-smoke.yml
 
           git commit --no-edit
           git status --short
