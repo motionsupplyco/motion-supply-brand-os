@@ -15,7 +15,16 @@ const USPTO_TRADEMARK_SEARCH_URL='https://tmsearch.uspto.gov/';
 
 export function normalizeSeedWords(input){
   const raw=Array.isArray(input)?input.join(' '):clean(input);
-  return unique(raw.split(/[\s,;/|]+/).map(word=>word.replace(/[^a-z0-9'-]/gi,'').trim()).filter(word=>word.length>=2&&word.length<=24)).slice(0,8);
+  const seen=new Set(),normalized=[];
+  for(const token of raw.split(/[\s,;/|]+/)){
+    const word=token.replace(/[^a-z0-9'-]/gi,'').trim();
+    if(word.length<2||word.length>24)continue;
+    const key=word.toLowerCase();
+    if(seen.has(key))continue;
+    seen.add(key);normalized.push(word);
+    if(normalized.length===8)break;
+  }
+  return normalized;
 }
 
 function titleCase(value){return clean(value).split(/\s+/).map(word=>word?word[0].toUpperCase()+word.slice(1).toLowerCase():'').join(' ')}
