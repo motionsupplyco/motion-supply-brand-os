@@ -61,10 +61,13 @@ test('problem education opens first-party help on the relevant tool and finance 
   assert.match(ui,/msboOpenHelp/);
   assert.match(ui,/problemHelpView/);
   assert.match(ui,/problemHelpTerm/);
+  assert.match(ui,/returnFocusSelector:'#menuBtn'/);
   assert.match(help,/data-help-tool=/);
   assert.match(help,/data-help-term=/);
   assert.match(help,/window\.msboOpenHelp=openHelp/);
   assert.match(help,/helpContextTarget/);
+  assert.match(help,/resolveHelpReturnFocus/);
+  assert.match(help,/returnFocusSelector/);
   assert.match(css,/\.helpContextTarget/);
 });
 

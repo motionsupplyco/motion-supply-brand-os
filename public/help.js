@@ -39,11 +39,22 @@ function helpContextTarget(root,{view='',term=''}={}){
   glossary?.classList.add('helpContextTarget');
   return glossary||tool||null;
 }
+function resolveHelpReturnFocus(context={}){
+  const selector=String(context.returnFocusSelector||'');
+  if(selector){
+    try{
+      const target=document.querySelector(selector);
+      if(target?.isConnected)return target;
+    }catch{}
+  }
+  const active=document.activeElement;
+  return active?.isConnected?active:null;
+}
 function openHelp(context={}){
   window.msboCloseMenu?.({restoreFocus:false});
   let root=document.querySelector('#helpRoot');
   if(!root){root=document.createElement('div');root.id='helpRoot';document.body.appendChild(root)}
-  helpReturnFocus=document.activeElement;
+  helpReturnFocus=resolveHelpReturnFocus(context);
   root.innerHTML=helpMarkup();
   root.classList.add('open');
   document.body.classList.add('helpOpen');
