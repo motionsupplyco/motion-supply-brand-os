@@ -20,9 +20,26 @@ async function expectNoDocumentOverflow(page){
   await expect.poll(async()=>page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1)).toBe(true);
 }
 
+async function openDrawerIfMobile(page){
+  const width=await page.evaluate(()=>window.innerWidth);
+  if(width<=820){
+    const side=page.locator('#side');
+    if(!await side.evaluate(el=>el.classList.contains('open'))){
+      await page.locator('#menuBtn').click();
+      await expect(side).toHaveClass(/\bopen\b/);
+    }
+  }
+}
+
 async function enterDemo(page){
+  await openDrawerIfMobile(page);
   await page.locator('#demoBtn').click();
   await expect(page.locator('#planPill')).toContainText(/DEMO/);
+}
+
+async function chooseRoute(page,selector){
+  await openDrawerIfMobile(page);
+  await page.locator(selector).click();
 }
 
 test('prefers-reduced-motion collapses shared motion durations in the rendered app',async({page})=>{
@@ -65,17 +82,12 @@ for(const viewport of [
     await enterDemo(page);
     await expectNoDocumentOverflow(page);
 
-    if(viewport.width<=820){
-      await page.locator('#menuBtn').click();
-      await expect(page.locator('#side')).toHaveClass(/\bopen\b/);
-    }
-    await page.locator('[data-view="profit"]').click();
+    await chooseRoute(page,'[data-view="profit"]');
     await expect(page.locator('#title')).toHaveText('Profit & Pricing');
     await expect(page.locator('input[data-key="price"]')).toBeVisible();
     await expectNoDocumentOverflow(page);
 
-    if(viewport.width<=820)await page.locator('#menuBtn').click();
-    await page.locator('[data-view="shopify"]').click();
+    await chooseRoute(page,'[data-view="shopify"]');
     await expect(page.locator('#csvFile')).toHaveAttribute('aria-label','Choose Shopify CSV file');
     await expectNoDocumentOverflow(page);
 
@@ -85,16 +97,14 @@ for(const viewport of [
 
 test('200 percent root text enlargement keeps core controls reachable without document-level horizontal overflow',async({page})=>{
   const errors=collectPageErrors(page);
-  await page.setViewportSize({width:1280,height:1000});
+  await page.setViewportSize({width:640,height:900});
   await page.goto(APP,{waitUntil:'domcontentloaded'});
   await page.addStyleTag({content:'html{font-size:200% !important}'});
   await enterDemo(page);
 
   await expect(page.locator('#menuBtn')).toBeVisible();
   await expectNoDocumentOverflow(page);
-  await page.locator('#menuBtn').click();
-  await expect(page.locator('#side')).toHaveClass(/\bopen\b/);
-  await page.locator('[data-view="profit"]').click();
+  await chooseRoute(page,'[data-view="profit"]');
   await expect(page.locator('input[data-key="price"]')).toBeVisible();
   await expectNoDocumentOverflow(page);
 
