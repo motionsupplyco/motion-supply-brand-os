@@ -61,13 +61,15 @@ test('problem education opens first-party help on the relevant tool and finance 
   assert.match(ui,/msboOpenHelp/);
   assert.match(ui,/problemHelpView/);
   assert.match(ui,/problemHelpTerm/);
-  assert.match(ui,/returnFocusSelector:'#menuBtn'/);
+  assert.match(ui,/return \['#problemNav','#menuBtn','#learnBtn'\]/);
+  assert.match(ui,/returnFocusSelectors/);
+  assert.match(ui,/firstVisibleControl/);
   assert.match(help,/data-help-tool=/);
   assert.match(help,/data-help-term=/);
   assert.match(help,/window\.msboOpenHelp=openHelp/);
   assert.match(help,/helpContextTarget/);
   assert.match(help,/resolveHelpReturnFocus/);
-  assert.match(help,/returnFocusSelector/);
+  assert.match(help,/returnFocusSelectors/);
   assert.match(css,/\.helpContextTarget/);
 });
 
@@ -78,5 +80,6 @@ test('navigator preserves mobile and keyboard accessibility contracts',()=>{
   assert.match(model,/<details class="problemExplain"><summary>/);
   assert.match(ui,/msboCloseMenu/);
   assert.match(ui,/aria-label','Solve a business problem'/);
+  assert.match(ui,/#problemNav/);
   assert.match(ui,/#menuBtn/);
 });
