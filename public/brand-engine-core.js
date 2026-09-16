@@ -45,8 +45,9 @@ export function brandNameProfile(name){
 export function trademarkSearchPlan(name){
   const normalized=titleCase(name).replace(/\s+/g,' ').replace(/"/g,'').trim();
   if(!normalized)return null;
-  const words=unique((normalized.match(/[a-z0-9]+/gi)||[]).map(word=>word.toLowerCase()));
-  const exactQuery=`CM:"${normalized}"`;
+  const searchName=normalized.toLowerCase();
+  const words=unique((searchName.match(/[a-z0-9]+/g)||[]));
+  const exactQuery=`CM:"${searchName}"`;
   const expandedQuery=words.length?`CM:(${words.map(word=>`/.*${regexLiteral(word)}.*/`).join(' AND ')})`:exactQuery;
   return {
     name:normalized,
