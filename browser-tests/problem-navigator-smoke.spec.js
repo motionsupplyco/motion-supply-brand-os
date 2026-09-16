@@ -49,7 +49,7 @@ test('problem-first navigator preserves founder inputs, opens contextual educati
 
   await page.locator('.helpClose').click();
   await expect(page.locator('#helpRoot')).not.toHaveClass(/\bopen\b/);
-  await expect(page.locator('#menuBtn')).toBeFocused();
+  await expect(page.locator('#problemNav')).toBeFocused();
   await page.locator('#problemNav').click();
   await page.locator('[data-problem-action="fix-margin"]').click();
   await expect(page.locator('#modal')).toHaveClass(/\bhidden\b/);
@@ -79,6 +79,16 @@ test('problem-first navigator is usable on mobile and closes the drawer before o
   await expect.poll(async()=>page.evaluate(()=>document.documentElement.scrollWidth-window.innerWidth),{timeout:2000}).toBeLessThanOrEqual(1);
   await page.screenshot({path:`${SHOTS}/problem-navigator-mobile.png`,fullPage:false});
 
+  await page.locator('[data-problem-id="cash"] [data-problem-help-view]').click();
+  await expect(page.locator('#modal')).toHaveClass(/\bhidden\b/);
+  await expect(page.locator('#helpRoot')).toHaveClass(/\bopen\b/);
+  await expect(page.locator('[data-help-term="Protected cash floor"]')).toHaveAttribute('open','');
+  await page.locator('.helpClose').click();
+  await expect(page.locator('#helpRoot')).not.toHaveClass(/\bopen\b/);
+  await expect(page.locator('#menuBtn')).toBeFocused();
+
+  await page.locator('#menuBtn').click();
+  await page.locator('#problemNav').click();
   await page.locator('[data-problem-id="cash"] summary').click();
   await expect(page.locator('[data-problem-id="cash"] .problemExplain')).toHaveAttribute('open','');
   await page.locator('[data-problem-action="protect-cash"]').click();
