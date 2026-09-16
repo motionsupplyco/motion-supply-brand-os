@@ -37,6 +37,7 @@ function openProblemHelp(button){
   const view=String(button?.dataset.problemHelpView||'');
   const term=String(button?.dataset.problemHelpTerm||'');
   closeNavigator();
+  $('#menuBtn')?.focus({preventScroll:true});
   requestAnimationFrame(()=>{
     if(typeof window.msboOpenHelp==='function')window.msboOpenHelp({view,term});
     else $('#learnBtn')?.click();
