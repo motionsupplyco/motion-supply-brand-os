@@ -39,16 +39,27 @@ function helpContextTarget(root,{view='',term=''}={}){
   glossary?.classList.add('helpContextTarget');
   return glossary||tool||null;
 }
+function helpReturnFocusCandidate(target){
+  if(!target?.isConnected||target.disabled)return null;
+  if(target.closest('[inert]')||target.closest('[aria-hidden="true"]'))return null;
+  const style=getComputedStyle(target);
+  if(style.display==='none'||style.visibility==='hidden')return null;
+  const rect=target.getBoundingClientRect();
+  if(rect.width<=0||rect.height<=0)return null;
+  if(rect.bottom<=0||rect.right<=0||rect.top>=window.innerHeight||rect.left>=window.innerWidth)return null;
+  return target;
+}
 function resolveHelpReturnFocus(context={}){
-  const selector=String(context.returnFocusSelector||'');
-  if(selector){
+  const raw=Array.isArray(context.returnFocusSelectors)?context.returnFocusSelectors:[context.returnFocusSelector];
+  for(const value of raw){
+    const selector=String(value||'');
+    if(!selector)continue;
     try{
-      const target=document.querySelector(selector);
-      if(target?.isConnected)return target;
+      const target=helpReturnFocusCandidate(document.querySelector(selector));
+      if(target)return target;
     }catch{}
   }
-  const active=document.activeElement;
-  return active?.isConnected?active:null;
+  return helpReturnFocusCandidate(document.activeElement);
 }
 function openHelp(context={}){
   window.msboCloseMenu?.({restoreFocus:false});
