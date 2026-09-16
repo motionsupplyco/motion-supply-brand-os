@@ -71,8 +71,10 @@ async function clickRoute(page,viewport,selector){
 }
 
 for(const viewport of VIEWPORTS){
-  test(`${viewport.name} traverses founder workspaces without overflow or browser crashes`,async({page})=>{
+  test(`${viewport.name} traverses founder workspaces without overflow or browser crashes`,async({page,browserName})=>{
     const errors=collectPageErrors(page);
+    const browserShots=`${SHOTS}/${browserName}`;
+    await mkdir(browserShots,{recursive:true});
     await page.setViewportSize({width:viewport.width,height:viewport.height});
     await page.goto(APP,{waitUntil:'domcontentloaded'});
     await expect(page.locator('#app')).toBeVisible();
@@ -85,11 +87,11 @@ for(const viewport of VIEWPORTS){
     for(const selector of ROUTES)await clickRoute(page,viewport,selector);
 
     await clickRoute(page,viewport,'[data-view="dashboard"]');
-    await page.screenshot({path:`${SHOTS}/${viewport.name}-dashboard.png`,fullPage:false});
+    await page.screenshot({path:`${browserShots}/${viewport.name}-dashboard.png`,fullPage:false});
     await clickRoute(page,viewport,'[data-view="profit"]');
-    await page.screenshot({path:`${SHOTS}/${viewport.name}-profit.png`,fullPage:false});
+    await page.screenshot({path:`${browserShots}/${viewport.name}-profit.png`,fullPage:false});
     await clickRoute(page,viewport,'[data-v2-view="cashforecast"]');
-    await page.screenshot({path:`${SHOTS}/${viewport.name}-cash-forecast.png`,fullPage:false});
+    await page.screenshot({path:`${browserShots}/${viewport.name}-cash-forecast.png`,fullPage:false});
 
     expect(errors,`uncaught browser errors: ${errors.join(' | ')}`).toEqual([]);
   });
