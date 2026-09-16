@@ -73,3 +73,40 @@ test('mobile sidebar utilities and custom V2 navigation close the drawer after s
 
   expect(errors,`uncaught browser errors: ${errors.join(' | ')}`).toEqual([]);
 });
+
+test('keyboard-only founder flow has skip navigation, labeled fields and operable quick actions',async({page})=>{
+  const errors=collectPageErrors(page);
+  await page.setViewportSize({width:1440,height:1000});
+  await page.goto(APP,{waitUntil:'domcontentloaded'});
+
+  const skip=page.locator('.skipLink');
+  await expect(skip).toHaveAttribute('href','#mainContent');
+  await skip.focus();
+  await expect(skip).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('#mainContent')).toBeFocused();
+
+  await page.locator('#demoBtn').click();
+  const dashboardNav=page.locator('[data-view="dashboard"]');
+  await expect(dashboardNav).toHaveAttribute('aria-current','page');
+
+  const quick=page.locator('.actioncard[data-jump="profit"]');
+  await expect(quick).toHaveAttribute('role','button');
+  await expect(quick).toHaveAttribute('tabindex','0');
+  await quick.focus();
+  await expect(quick).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('#title')).toHaveText('Profit & Pricing');
+  await expect(page.locator('[data-view="profit"]')).toHaveAttribute('aria-current','page');
+
+  const price=page.locator('input[data-key="price"]');
+  const priceId=await price.getAttribute('id');
+  expect(priceId).toBeTruthy();
+  await expect(page.locator(`label[for="${priceId}"]`)).toContainText(/price/i);
+
+  await page.locator('[data-view="shopify"]').click();
+  await expect(page.locator('#csvFile')).toHaveAttribute('aria-label','Choose Shopify CSV file');
+  await page.screenshot({path:`${SHOTS}/desktop-keyboard-accessibility.png`,fullPage:false});
+
+  expect(errors,`uncaught browser errors: ${errors.join(' | ')}`).toEqual([]);
+});
