@@ -40,6 +40,7 @@ jobs:
           node --check public/workspace-route.js
           node --check public/problem-navigator.js
           node --check public/problem-navigator-ui.js
+          node --check public/guided-dashboard.js
           node --check public/operating-intelligence.js
           node --check public/collection-stress.js
           node --check public/net-profit-guardrails.js
