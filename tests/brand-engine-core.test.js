@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {BRAND_ENGINE_VIBES,normalizeSeedWords,brandNameProfile,domainLabelForName,domainCandidates,socialHandleCandidates,generateBrandNames} from '../public/brand-engine-core.js';
+import {BRAND_ENGINE_VIBES,BRAND_ENGINE_USPTO_SEARCH_URL,normalizeSeedWords,brandNameProfile,trademarkSearchPlan,domainLabelForName,domainCandidates,socialHandleCandidates,generateBrandNames} from '../public/brand-engine-core.js';
 
 test('Brand Engine exposes intentional naming vibes',()=>{
   assert.deepEqual(BRAND_ENGINE_VIBES,['minimal','street','luxury','technical','vintage']);
@@ -28,12 +28,29 @@ test('social handle candidates stay within common platform length boundaries',()
   assert.equal(new Set(handles).size,handles.length);
 });
 
+test('USPTO pre-screen plan gives official manual search steps without a clearance verdict',()=>{
+  const plan=trademarkSearchPlan('Ghost Dept');
+  assert.equal(plan.officialUrl,BRAND_ENGINE_USPTO_SEARCH_URL);
+  assert.equal(plan.exactQuery,'CM:"Ghost Dept"');
+  assert.equal(plan.expandedQuery,'CM:(/.*ghost.*/ AND /.*dept.*/)');
+  assert.ok(plan.guidance.some(step=>/alternative spellings, pronunciations/i.test(step)));
+  assert.ok(plan.guidance.some(step=>/Class 025 alone/i.test(step)));
+  assert.match(plan.disclaimer,/not a clearance opinion/i);
+  assert.doesNotMatch(JSON.stringify(plan),/trademark clear|clearance score|registration probability/i);
+});
+
+test('USPTO pre-screen safely builds expanded queries from punctuation-heavy names',()=>{
+  const plan=trademarkSearchPlan("A/B Works 99");
+  assert.equal(plan.exactQuery,'CM:"A/b Works 99"');
+  assert.equal(plan.expandedQuery,'CM:(/.*a.*/ AND /.*b.*/ AND /.*works.*/ AND /.*99.*/)');
+});
+
 test('name generation is deterministic for the same founder input',()=>{
   const a=generateBrandNames({seedWords:'void ghost',vibe:'street',count:12});
   const b=generateBrandNames({seedWords:'void ghost',vibe:'street',count:12});
   assert.deepEqual(a,b);
   assert.equal(a.length,12);
-  assert.ok(a.every(item=>item.name&&item.domains.length===3&&item.handles.length>0));
+  assert.ok(a.every(item=>item.name&&item.trademark?.officialUrl===BRAND_ENGINE_USPTO_SEARCH_URL&&item.domains.length===3&&item.handles.length>0));
 });
 
 test('name profile gives observable fit notes instead of a fake quality score',()=>{
