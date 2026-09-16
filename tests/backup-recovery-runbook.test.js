@@ -11,7 +11,7 @@ const runbook = fs.readFileSync(path.join(root, 'docs', 'SUPABASE_BACKUP_RECOVER
 const gitignore = fs.readFileSync(path.join(root, '.gitignore'), 'utf8');
 
 test('Supabase recovery runbook reflects the current Free-plan posture', () => {
-  assert.match(runbook, /Free plan/i);
+  assert.match(runbook, /Organization plan:\s*\*\*Free\*\*/i);
   assert.match(runbook, /supabase db dump/i);
   assert.match(runbook, /off-site/i);
   assert.match(runbook, /encrypted/i);
