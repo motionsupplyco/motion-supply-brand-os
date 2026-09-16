@@ -18,7 +18,7 @@ test('Supabase recovery runbook reflects the current Free-plan posture', () => {
 test('backup procedure protects sensitive Auth and customer data', () => {
   assert.match(runbook, /auth\.users/i);
   assert.match(runbook, /password hash/i);
-  assert.match(runbook, /do not commit/i);
+  assert.match(runbook, /(?:never|do not) commit/i);
   assert.match(runbook, /checksum/i);
   assert.match(gitignore, /^backups\/$/m);
   assert.match(gitignore, /^roles\.sql$/m);
@@ -37,7 +37,7 @@ test('restore procedure is a drill against a disposable target, not production',
 
 test('recovery explicitly separates restore verification from schema migrations', () => {
   assert.match(runbook, /v2_operating_intelligence_verify\.sql/i);
-  assert.match(runbook, /never blindly/i);
-  assert.match(runbook, /do not re-run/i);
+  assert.match(runbook, /never blindly re-run/i);
+  assert.match(runbook, /read-only verifier/i);
   assert.match(runbook, /migration/i);
 });
