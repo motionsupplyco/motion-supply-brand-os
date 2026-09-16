@@ -18,21 +18,87 @@ jobs:
         with:
           ref: full-stack-integration-candidate
           fetch-depth: 0
-      - name: Merge full V3 and UX stack
+
+      - name: Merge V3 UX stack with explicit additive resolutions
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git fetch origin ux-advisor-action-resources
-          if ! git merge --no-ff --no-edit origin/ux-advisor-action-resources; then
-            echo "::error::Full-stack integration conflict"
-            echo "Conflicting files:"
-            git diff --name-only --diff-filter=U
-            echo "Status:"
-            git status --short
+
+          git show HEAD:browser-tests/v2-release-smoke.spec.js > /tmp/p0-v2-release-smoke.spec.js
+
+          if git merge --no-ff --no-edit origin/ux-advisor-action-resources; then
+            echo "::error::Expected the known three-file integration conflict, but merge completed cleanly; refusing to apply stale resolution logic."
             exit 1
           fi
+
+          actual="$(git diff --name-only --diff-filter=U | sort)"
+          expected="$(printf '%s\n' '.github/workflows/v2-browser-smoke.yml' 'browser-tests/v2-release-smoke.spec.js' 'public/index.html' | sort)"
+          if [ "$actual" != "$expected" ]; then
+            echo "::error::Unexpected conflict set"
+            echo "Expected:"
+            printf '%s\n' "$expected"
+            echo "Actual:"
+            printf '%s\n' "$actual"
+            exit 1
+          fi
+
+          # P0 workflow is the strict superset: all Chromium specs + WebKit device matrix.
+          git checkout --ours .github/workflows/v2-browser-smoke.yml
+
+          # UX/V3 smoke contains Brand Engine coverage. Append only the two P0-only tests.
+          git checkout --theirs browser-tests/v2-release-smoke.spec.js
+          node <<'NODE'
+          const fs=require('fs');
+          const targetPath='browser-tests/v2-release-smoke.spec.js';
+          const ours=fs.readFileSync('/tmp/p0-v2-release-smoke.spec.js','utf8');
+          let target=fs.readFileSync(targetPath,'utf8').trimEnd();
+          const marker="test('Shopify CSV import rejects malformed input without saving it and accepts a valid export-shaped file'";
+          const keyboard="test('keyboard-only founder flow has skip navigation, labeled fields and operable quick actions'";
+          const start=ours.indexOf(marker);
+          if(start<0 || ours.indexOf(keyboard,start)<0) throw new Error('P0-only smoke anchors missing');
+          if(target.includes(marker) || target.includes(keyboard)) throw new Error('P0-only smoke already present in UX file');
+          const p0Only=ours.slice(start).trim();
+          fs.writeFileSync(targetPath,`${target}\n\n${p0Only}\n`);
+          NODE
+
+          # UX/V3 index owns the new product surfaces. Add the P0 accessibility layer once.
+          git checkout --theirs public/index.html
+          node <<'NODE'
+          const fs=require('fs');
+          const path='public/index.html';
+          let html=fs.readFileSync(path,'utf8');
+          const css='<link rel="stylesheet" href="accessibility.css" />';
+          const js='<script type="module" src="accessibility.js"></script>';
+          if(html.includes(css) || html.includes(js)) throw new Error('Accessibility asset unexpectedly already present');
+          if((html.match(/<\/head>/g)||[]).length!==1 || (html.match(/<\/body>/g)||[]).length!==1) throw new Error('HTML insertion anchors are not unique');
+          html=html.replace('</head>',`${css}\n</head>`).replace('</body>',`${js}\n</body>`);
+          fs.writeFileSync(path,html);
+          NODE
+
+          git add .github/workflows/v2-browser-smoke.yml browser-tests/v2-release-smoke.spec.js public/index.html
+
+          if [ -n "$(git diff --name-only --diff-filter=U)" ]; then
+            echo "::error::Unresolved merge conflicts remain"
+            git diff --name-only --diff-filter=U
+            exit 1
+          fi
+
+          test "$(grep -Fc 'accessibility.css' public/index.html)" -eq 1
+          test "$(grep -Fc 'accessibility.js' public/index.html)" -eq 1
+          test "$(grep -Fc 'id="problemNav"' public/index.html)" -eq 1
+          test "$(grep -Fc 'brand-engine-handoff.js' public/index.html)" -eq 1
+          test "$(grep -Fc "Shopify CSV import rejects malformed input without saving it and accepts a valid export-shaped file" browser-tests/v2-release-smoke.spec.js)" -eq 1
+          test "$(grep -Fc "keyboard-only founder flow has skip navigation, labeled fields and operable quick actions" browser-tests/v2-release-smoke.spec.js)" -eq 1
+          test "$(grep -Fc "Brand Engine generates founder directions" browser-tests/v2-release-smoke.spec.js)" -eq 1
+          grep -Fq 'browser-tests/*.spec.js --project=chromium' .github/workflows/v2-browser-smoke.yml
+          grep -Fq 'device-matrix-smoke.spec.js --project=webkit' .github/workflows/v2-browser-smoke.yml
+          git diff --check
+
+          git commit --no-edit
           git status --short
-          git log --oneline --decorate -16
+          git log --oneline --decorate -18
+
       - name: Push disposable integration candidate
         run: git push origin HEAD:full-stack-integration-candidate
