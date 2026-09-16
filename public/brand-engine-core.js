@@ -78,10 +78,11 @@ export function socialHandleCandidates(name){
   return unique([base,`${base}co`,`${base}goods`,`${base}studio`,`shop${base}`,`${base}official`]).filter(value=>value.length<=30).slice(0,6);
 }
 
-export function generateBrandNames({seedWords=[],vibe='street',count=12}={}){
+export function generateBrandNames({seedWords=[],vibe='street',count=12,variation=0}={}){
   const seeds=normalizeSeedWords(seedWords).map(titleCase);
   const style=VIBES[vibe]||VIBES.street;
-  const seedKey=`${seeds.join('|')}|${vibe}`;
+  const variationKey=Math.max(0,Math.trunc(Number(variation)||0));
+  const seedKey=`${seeds.join('|')}|${vibe}${variationKey?`|variation:${variationKey}`:''}`;
   const vibeWords=rotate(style,seedKey);
   const prefixes=rotate(PREFIXES,`${seedKey}|p`);
   const suffixes=rotate(SUFFIXES,`${seedKey}|s`);
