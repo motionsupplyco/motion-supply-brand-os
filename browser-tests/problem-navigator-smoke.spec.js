@@ -15,7 +15,7 @@ async function expectDrawerOffCanvas(page){
   await expect.poll(async()=>page.locator('#side').evaluate(el=>Math.round(el.getBoundingClientRect().right)),{timeout:2000}).toBeLessThanOrEqual(1);
 }
 
-test('problem-first navigator opens without mutating founder inputs and routes into existing tools',async({page})=>{
+test('problem-first navigator preserves founder inputs, opens contextual education and routes into existing tools',async({page})=>{
   const errors=collectPageErrors(page);
   await page.setViewportSize({width:1440,height:1000});
   await page.addInitScript(()=>{
@@ -37,6 +37,20 @@ test('problem-first navigator opens without mutating founder inputs and routes i
   const afterOpen=await page.evaluate(()=>({state:localStorage.getItem('msbo_state'),touched:localStorage.getItem('msbo_touched')}));
   expect(afterOpen).toEqual(before);
 
+  await page.locator('[data-problem-id="margin"] [data-problem-help-view]').click();
+  await expect(page.locator('#modal')).toHaveClass(/\bhidden\b/);
+  await expect(page.locator('#helpRoot')).toHaveClass(/\bopen\b/);
+  await expect(page.locator('[data-help-tool="profit"]')).toHaveClass(/helpContextTarget/);
+  await expect(page.locator('[data-help-term="Contribution"]')).toHaveAttribute('open','');
+  await expect(page.locator('[data-help-term="Contribution"]')).toHaveClass(/helpContextTarget/);
+  await expect(page.locator('[data-help-term="Contribution"] summary')).toBeFocused();
+  const afterHelp=await page.evaluate(()=>({state:localStorage.getItem('msbo_state'),touched:localStorage.getItem('msbo_touched')}));
+  expect(afterHelp).toEqual(before);
+
+  await page.locator('.helpClose').click();
+  await expect(page.locator('#helpRoot')).not.toHaveClass(/\bopen\b/);
+  await expect(page.locator('#menuBtn')).toBeFocused();
+  await page.locator('#problemNav').click();
   await page.locator('[data-problem-action="fix-margin"]').click();
   await expect(page.locator('#modal')).toHaveClass(/\bhidden\b/);
   await expect(page.locator('#title')).toHaveText('Profit Guardrails');
