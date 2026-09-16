@@ -2,12 +2,16 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {brandEngineProviderConfig,normalizeDomainCheckRequest,brandEngineEventPayload} from '../lib/brand-engine-routes.js';
 
-test('Brand Engine provider config tells the truth about unsupported automated trademark/social checks',()=>{
+test('Brand Engine provider config distinguishes manual official trademark screening from unsupported automation',()=>{
   const config=brandEngineProviderConfig({SUPABASE_URL:'x',SUPABASE_SECRET_KEY:'y'});
   assert.equal(config.domains.enabled,true);
   assert.match(config.domains.source,/RDAP/);
-  assert.equal(config.trademarks.enabled,false);
-  assert.match(config.trademarks.reason,/will not scrape/i);
+  assert.equal(config.trademarks.enabled,true);
+  assert.equal(config.trademarks.mode,'official_manual_prescreen');
+  assert.equal(config.trademarks.automatedScreening,false);
+  assert.equal(config.trademarks.searchUrl,'https://tmsearch.uspto.gov/');
+  assert.match(config.trademarks.reason,/does not scrape/i);
+  assert.match(config.trademarks.reason,/trademark-clear/i);
   assert.equal(config.social.mode,'verification_links_only');
   assert.equal(config.initializeBrand.enabled,true);
 });
@@ -15,7 +19,8 @@ test('Brand Engine provider config tells the truth about unsupported automated t
 test('provider config stays honest when account storage is unavailable',()=>{
   const config=brandEngineProviderConfig({});
   assert.equal(config.initializeBrand.enabled,false);
-  assert.equal(config.trademarks.mode,'official_provider_required');
+  assert.equal(config.trademarks.enabled,true);
+  assert.equal(config.trademarks.automatedScreening,false);
 });
 
 test('domain request normalizes and deduplicates founder input',()=>{
