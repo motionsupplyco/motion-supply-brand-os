@@ -135,6 +135,26 @@ test('Brand Engine stays usable at 390×844 with wrapped USPTO queries and no ho
   expect(errors,`uncaught browser errors: ${errors.join(' | ')}`).toEqual([]);
 });
 
+test('unsigned Brand Engine handoff preserves the chosen name without creating a brand',async({page})=>{
+  const errors=collectPageErrors(page);let brandPosts=0;
+  await page.route('**/api/brand-engine/event',async route=>route.fulfill({status:200,contentType:'application/json',body:'{"ok":true}'}));
+  await page.route('**/api/brands',async route=>{
+    if(route.request().method()==='POST')brandPosts++;
+    await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({brands:[]})});
+  });
+  await page.goto(`${APP}brand-engine.html`,{waitUntil:'domcontentloaded'});
+  const first=page.locator('.nameCard').first();
+  const chosen=(await first.locator('h3').textContent())?.trim();
+  expect(chosen).toBeTruthy();
+  await first.locator('[data-use-name]').click();
+  await expect(page.locator('#brandEngineHandoff')).toBeVisible({timeout:5000});
+  await expect(page.locator('#brandEngineHandoff')).toContainText(`You picked ${chosen}.`);
+  await expect(page.locator('#brandEngineAuth')).toBeVisible();
+  expect(brandPosts,'unsigned handoff must not create a brand').toBe(0);
+  expect(await page.evaluate(()=>localStorage.getItem('msbo_pending_brand_name'))).toBe(chosen);
+  expect(errors,`uncaught browser errors: ${errors.join(' | ')}`).toEqual([]);
+});
+
 test('Brand Engine handoff never creates a brand until the founder explicitly presses Initialize',async({page})=>{
   const errors=collectPageErrors(page),events=[];let brandPosts=0;
   await page.addInitScript(()=>{
