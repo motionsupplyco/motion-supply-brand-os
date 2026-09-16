@@ -34,9 +34,10 @@ test('structured API logging is wired immediately after request ID middleware', 
 });
 
 test('structured logger allowlists operational fields and never inspects sensitive request payloads', () => {
-  for (const field of ['timestamp','level','event','request_id','method','route','status','duration_ms']) {
+  for (const field of ['timestamp','level','event','request_id','method','route','duration_ms']) {
     assert.match(structuredLog, new RegExp(`${field}:`));
   }
+  assert.match(structuredLog, /\n\s*status,\n/);
   assert.match(structuredLog, /event:'http_request'/);
   assert.match(structuredLog, /startsWith\('\/api'\)/);
   assert.doesNotMatch(structuredLog, /req\?\.body|req\.body|req\?\.query|req\.query|authorization|cookie|x-forwarded-for|req\?\.ip|req\.ip/i);
