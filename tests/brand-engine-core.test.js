@@ -6,8 +6,8 @@ test('Brand Engine exposes intentional naming vibes',()=>{
   assert.deepEqual(BRAND_ENGINE_VIBES,['minimal','street','luxury','technical','vintage']);
 });
 
-test('seed normalization removes junk, dedupes and caps the set',()=>{
-  assert.deepEqual(normalizeSeedWords('ghost, GHOST / archive; 88 $$ void motion supply studio night'),['ghost','GHOST','archive','88','void','motion','supply','studio']);
+test('seed normalization removes junk, dedupes case-insensitively and caps the set',()=>{
+  assert.deepEqual(normalizeSeedWords('ghost, GHOST / archive; 88 $$ void motion supply studio night'),['ghost','archive','88','void','motion','supply','studio','night']);
 });
 
 test('domain labels are conservative and URL-friendly',()=>{
