@@ -1,0 +1,67 @@
+name: One-time structured log wiring
+
+on:
+  push:
+    branches: [p0-production-observability]
+
+permissions:
+  contents: write
+
+jobs:
+  wire:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v7
+        with:
+          ref: p0-production-observability
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Wire structured logger at request-ID boundary
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path('server.js')
+          text = path.read_text()
+          import_line = "import { structuredRequestLogger } from './lib/structured-log.js';"
+          middleware_line = "app.use(structuredRequestLogger());"
+
+          lines = text.splitlines()
+          if import_line not in lines:
+              matches = [i for i,line in enumerate(lines) if line.strip() == "import { registerV2PlanningRoutes } from './lib/v2-planning-routes.js';"]
+              if len(matches) != 1:
+                  raise SystemExit(f'expected one import anchor, found {len(matches)}')
+              lines.insert(matches[0] + 1, import_line)
+
+          if middleware_line not in lines:
+              matches = [i for i,line in enumerate(lines) if line.startswith("app.use((req,res,next)=>{res.setHeader('X-Request-Id'")]
+              if len(matches) != 1:
+                  raise SystemExit(f'expected one request-id middleware anchor, found {len(matches)}')
+              lines.insert(matches[0] + 1, middleware_line)
+
+          result = '\n'.join(lines) + '\n'
+          if result.count(import_line) != 1 or result.count(middleware_line) != 1:
+              raise SystemExit('structured logger wiring is not singular')
+          path.write_text(result)
+      - name: Verify syntax and exact wiring
+        run: |
+          node --check server.js
+          grep -F "import { structuredRequestLogger } from './lib/structured-log.js';" server.js
+          grep -F "app.use(structuredRequestLogger());" server.js
+          git diff --check
+      - name: Commit exact server wiring
+        run: |
+          if git diff --quiet -- server.js; then
+            echo "server.js already wired"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add server.js
+          git commit -m "feat: wire structured API request logging"
+          git push origin HEAD:p0-production-observability
