@@ -8,3 +8,13 @@ yarn-debug.log*
 yarn-error.log*
 coverage/
 .vercel/
+
+# Local/manual Supabase backup artifacts (contain sensitive Auth/customer data)
+backups/
+*.backup
+*.dump
+roles.sql
+schema.sql
+data.sql
+history_schema.sql
+history_data.sql

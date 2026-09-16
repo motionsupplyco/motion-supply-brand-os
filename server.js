@@ -9,6 +9,7 @@ import { claimStripeWebhook, completeStripeWebhook, failStripeWebhook } from './
 import { customerForCheckout, customerForPortal, sanitizeStripeBilling } from './lib/stripe-customer-recovery.integration.js';
 import { registerV2PreJsonRoutes, registerV2Routes } from './lib/v2-routes.js';
 import { registerV2PlanningRoutes } from './lib/v2-planning-routes.js';
+import { structuredRequestLogger } from './lib/structured-log.js';
 
 const __dirname=path.dirname(fileURLToPath(import.meta.url));
 const app=express(); const port=Number(process.env.PORT||3000);
@@ -37,6 +38,7 @@ function trustedRecoveryOrigin(req){
 
 app.set('trust proxy',1); app.disable('x-powered-by');
 app.use((req,res,next)=>{res.setHeader('X-Request-Id',req.headers['x-request-id']||crypto.randomUUID());res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Referrer-Policy','strict-origin-when-cross-origin');res.setHeader('Permissions-Policy','camera=(), microphone=(), geolocation=()');res.setHeader('X-Frame-Options','DENY');res.setHeader('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'");if(req.path.startsWith('/api/'))res.setHeader('Cache-Control','no-store');if(process.env.NODE_ENV==='production')res.setHeader('Strict-Transport-Security','max-age=31536000; includeSubDomains');next()});
+app.use(structuredRequestLogger());
 const buckets=new Map(); const RATE_BUCKET_SOFT_LIMIT=5000,RATE_BUCKET_HARD_LIMIT=10000,RATE_BUCKET_MAX_AGE=60*60_000;
 function pruneRateBuckets(now){if(buckets.size<RATE_BUCKET_SOFT_LIMIT)return;for(const[k,x]of buckets){if(now-(x.touchedAt||x.start)>RATE_BUCKET_MAX_AGE)buckets.delete(k)}if(buckets.size>RATE_BUCKET_HARD_LIMIT){let remove=buckets.size-RATE_BUCKET_HARD_LIMIT;for(const k of buckets.keys()){buckets.delete(k);if(--remove<=0)break}}}
 function limiter(name,windowMs,max){return(req,res,next)=>{const key=`${name}:${req.ip||'unknown'}`,now=Date.now();pruneRateBuckets(now);const x=buckets.get(key)||{count:0,start:now,touchedAt:now};if(now-x.start>windowMs){x.count=0;x.start=now}x.count++;x.touchedAt=now;buckets.set(key,x);if(x.count>max){res.setHeader('Retry-After',Math.max(1,Math.ceil((windowMs-(now-x.start))/1000)));return res.status(429).json({error:'Too many requests. Try again shortly.',code:'RATE_LIMITED'})}next()}}
