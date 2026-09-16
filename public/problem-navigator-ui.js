@@ -33,14 +33,29 @@ function openAction(action){
   });
 }
 
+function problemHelpReturnFocusSelectors(){
+  return ['#problemNav','#menuBtn','#learnBtn'];
+}
+
+function firstVisibleControl(selectors){
+  for(const selector of selectors){
+    const target=$(selector);
+    if(!target?.isConnected||target.disabled||target.closest('[inert]'))continue;
+    const rect=target.getBoundingClientRect();
+    if(rect.width>0&&rect.height>0&&rect.bottom>0&&rect.right>0&&rect.top<window.innerHeight&&rect.left<window.innerWidth)return target;
+  }
+  return null;
+}
+
 function openProblemHelp(button){
   const view=String(button?.dataset.problemHelpView||'');
   const term=String(button?.dataset.problemHelpTerm||'');
+  const returnFocusSelectors=problemHelpReturnFocusSelectors();
   closeNavigator();
   requestAnimationFrame(()=>{
-    if(typeof window.msboOpenHelp==='function')window.msboOpenHelp({view,term,returnFocusSelector:'#menuBtn'});
+    if(typeof window.msboOpenHelp==='function')window.msboOpenHelp({view,term,returnFocusSelectors});
     else{
-      $('#menuBtn')?.focus({preventScroll:true});
+      firstVisibleControl(returnFocusSelectors)?.focus({preventScroll:true});
       $('#learnBtn')?.click();
     }
   });
