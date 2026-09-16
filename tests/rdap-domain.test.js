@@ -4,6 +4,8 @@ import {normalizeDomain,rdapBaseForDomain,lookupDomainRdap,checkDomainsRdap,RDAP
 
 const bootstrap={services:[[['com'],['https://rdap.example/']], [['co'],['https://rdap.co.example']]]};
 
+const headers=location=>({get:name=>String(name||'').toLowerCase()==='location'?location:null});
+
 test('domain normalization accepts domains and URLs but rejects malformed labels',()=>{
   assert.equal(normalizeDomain('HTTPS://Example.COM/path'),'example.com');
   assert.equal(normalizeDomain('bücher.com'),'xn--bcher-kva.com');
@@ -26,6 +28,7 @@ test('authoritative 404 is represented as not found, not a guaranteed purchase c
   assert.equal(result.registered,false);
   assert.match(result.reason,/verify with a registrar/i);
   assert.equal(calls[0].url,'https://rdap.example/domain/voiddept.com');
+  assert.equal(calls[0].options.redirect,'manual');
 });
 
 test('200 RDAP response means a registration record exists',async()=>{
@@ -35,6 +38,30 @@ test('200 RDAP response means a registration record exists',async()=>{
   assert.equal(result.registered,true);
   assert.equal(result.handle,'D123');
   assert.deepEqual(result.statuses,['active']);
+});
+
+test('same-origin HTTPS RDAP redirects can be followed within the authoritative service',async()=>{
+  const calls=[];
+  const fetchImpl=async url=>{
+    calls.push(String(url));
+    if(calls.length===1)return {ok:false,status:302,headers:headers('/domain/voiddept.com?followed=1'),json:async()=>({})};
+    return {ok:false,status:404,json:async()=>({})};
+  };
+  const result=await lookupDomainRdap('voiddept.com',{bootstrap,fetchImpl});
+  assert.equal(result.status,'not_found');
+  assert.deepEqual(calls,['https://rdap.example/domain/voiddept.com','https://rdap.example/domain/voiddept.com?followed=1']);
+});
+
+test('cross-origin or protocol-changing RDAP redirects are blocked instead of followed',async()=>{
+  for(const location of ['https://169.254.169.254/latest/meta-data/','http://rdap.example/domain/voiddept.com']){
+    const calls=[];
+    const fetchImpl=async url=>{calls.push(String(url));return {ok:false,status:302,headers:headers(location),json:async()=>({})}};
+    const result=await lookupDomainRdap('voiddept.com',{bootstrap,fetchImpl});
+    assert.equal(result.status,'unknown');
+    assert.equal(result.registered,null);
+    assert.match(result.reason,/redirect was blocked/i);
+    assert.equal(calls.length,1,'unsafe redirect must never be fetched');
+  }
 });
 
 test('unsupported TLD stays unknown instead of being labeled available',async()=>{
