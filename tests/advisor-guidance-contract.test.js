@@ -46,8 +46,8 @@ test('advisor UI prioritizes Brand OS action/help before optional external readi
   assert.match(index,/advisor-guidance\.css/);
   assert.match(index,/advisor-resources\.js/);
   assert.match(ui,/DO THIS IN BRAND OS/);
-  assert.match(ui,/data\.advisorPrimary/);
-  assert.match(ui,/data\.advisorHelp/);
+  assert.match(ui,/dataset\.advisorPrimary/);
+  assert.match(ui,/dataset\.advisorHelp/);
   assert.match(ui,/msboOpenHelp/);
   assert.match(ui,/problemNavigatorTarget/);
   assert.match(ui,/OPTIONAL OUTSIDE READING/);
