@@ -18,7 +18,7 @@ jobs:
         with:
           ref: p0-integration-candidate
           fetch-depth: 0
-      - name: Merge verified P0 draft branches
+      - name: Merge verified P0 draft branches with explicit additive resolutions
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
@@ -36,14 +36,48 @@ jobs:
           git fetch origin "${branches[@]}"
           for branch in "${branches[@]}"; do
             echo "=== merging $branch ==="
-            if ! git merge --no-ff --no-edit "origin/$branch"; then
-              echo "::error::Conflict while merging $branch"
-              git status --short
-              git diff --name-only --diff-filter=U
-              exit 1
+            if git merge --no-ff --no-edit "origin/$branch"; then
+              continue
             fi
+
+            conflicts="$(git diff --name-only --diff-filter=U)"
+            echo "conflicts:"
+            printf '%s\n' "$conflicts"
+
+            if [[ "$branch" == "p0-accessibility-pass" && "$conflicts" == "browser-tests/v2-release-smoke.spec.js" ]]; then
+              git show :2:browser-tests/v2-release-smoke.spec.js > /tmp/shopify-smoke.js
+              git show :3:browser-tests/v2-release-smoke.spec.js > /tmp/accessibility-smoke.js
+              python3 - <<'PY'
+          from pathlib import Path
+          ours = Path('/tmp/shopify-smoke.js').read_text()
+          theirs = Path('/tmp/accessibility-smoke.js').read_text()
+          marker = "test('keyboard-only founder flow has skip navigation, labeled fields and operable quick actions'"
+          if marker not in theirs:
+              raise SystemExit('accessibility smoke marker missing')
+          if marker not in ours:
+              ours = ours.rstrip() + '\n\n' + theirs[theirs.index(marker):].lstrip()
+          Path('browser-tests/v2-release-smoke.spec.js').write_text(ours)
+          PY
+              git add browser-tests/v2-release-smoke.spec.js
+              GIT_EDITOR=true git merge --continue
+              continue
+            fi
+
+            if [[ "$branch" == "p0-device-qa-matrix" && "$conflicts" == ".github/workflows/v2-browser-smoke.yml" ]]; then
+              git checkout --theirs .github/workflows/v2-browser-smoke.yml
+              git add .github/workflows/v2-browser-smoke.yml
+              GIT_EDITOR=true git merge --continue
+              continue
+            fi
+
+            echo "::error::Unexpected conflict while merging $branch"
+            git status --short
+            exit 1
           done
+
+          node --check browser-tests/v2-release-smoke.spec.js
+          git diff --check HEAD~1 HEAD || true
           git status --short
-          git log --oneline --decorate -12
+          git log --oneline --decorate -16
       - name: Push integration candidate
         run: git push origin HEAD:p0-integration-candidate
