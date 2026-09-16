@@ -5,6 +5,7 @@ import {readFile} from 'node:fs/promises';
 const index=await readFile(new URL('../public/index.html',import.meta.url),'utf8');
 const model=await readFile(new URL('../public/problem-navigator.js',import.meta.url),'utf8');
 const ui=await readFile(new URL('../public/problem-navigator-ui.js',import.meta.url),'utf8');
+const help=await readFile(new URL('../public/help.js',import.meta.url),'utf8');
 const css=await readFile(new URL('../public/problem-navigator.css',import.meta.url),'utf8');
 
 function occurrences(value,needle){return value.split(needle).length-1}
@@ -30,6 +31,7 @@ test('navigator covers the founder problems without inventing a diagnosis or bus
   assert.doesNotMatch(model,/type="number"/);
   assert.doesNotMatch(model,/localStorage\.(?:setItem|removeItem)/);
   assert.doesNotMatch(model,/fetch\(/);
+  assert.doesNotMatch(model,/https?:\/\//);
 });
 
 test('contextual actions reuse existing Brand OS destinations instead of duplicating calculators',()=>{
@@ -50,6 +52,22 @@ test('contextual actions reuse existing Brand OS destinations instead of duplica
   assert.match(ui,/target\.click\(\)/);
 });
 
+test('problem education opens first-party help on the relevant tool and finance term',()=>{
+  for(const [view,term] of [['profit','Contribution'],['inventory','Reorder point'],['cac','CAC'],['cash','Protected cash floor'],['launch','Break-even orders'],['shopify','AOV'],['advisor','']]){
+    assert.ok(model.includes(`help:['${view}','${term}']`),`missing contextual help ${view}/${term}`);
+  }
+  assert.match(model,/data-problem-help-view/);
+  assert.match(model,/Open guided help/);
+  assert.match(ui,/msboOpenHelp/);
+  assert.match(ui,/problemHelpView/);
+  assert.match(ui,/problemHelpTerm/);
+  assert.match(help,/data-help-tool=/);
+  assert.match(help,/data-help-term=/);
+  assert.match(help,/window\.msboOpenHelp=openHelp/);
+  assert.match(help,/helpContextTarget/);
+  assert.match(css,/\.helpContextTarget/);
+});
+
 test('navigator preserves mobile and keyboard accessibility contracts',()=>{
   assert.match(css,/\.modalbox\.problemNavigatorModal/);
   assert.match(css,/@media\(max-width:680px\)/);
@@ -57,4 +75,5 @@ test('navigator preserves mobile and keyboard accessibility contracts',()=>{
   assert.match(model,/<details class="problemExplain"><summary>/);
   assert.match(ui,/msboCloseMenu/);
   assert.match(ui,/aria-label','Solve a business problem'/);
+  assert.match(ui,/#menuBtn/);
 });
