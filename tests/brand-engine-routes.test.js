@@ -45,12 +45,16 @@ test('Brand Engine analytics accepts only funnel-safe fields and strips names/do
   assert.equal('domains' in event.properties,false);
 });
 
-test('Brand Engine analytics clamps counts and rejects unknown event names',()=>{
-  const event=brandEngineEventPayload({event_name:'brand_engine_names_generated',anonymous_id:'x'.repeat(200),properties:{count:999,domain_count:999,vibe:'not-real',entrypoint:'x'.repeat(100)}});
+test('Brand Engine analytics clamps counts, allowlists entrypoints, and rejects unknown event names',()=>{
+  const event=brandEngineEventPayload({event_name:'brand_engine_names_generated',anonymous_id:'x'.repeat(200),properties:{count:999,domain_count:999,vibe:'not-real',entrypoint:'email@example.com'}});
   assert.equal(event.anonymousId.length,80);
   assert.equal(event.properties.count,30);
   assert.equal(event.properties.domain_count,3);
   assert.equal('vibe' in event.properties,false);
-  assert.equal(event.properties.entrypoint.length,40);
+  assert.equal('entrypoint' in event.properties,false,'arbitrary public input must not become analytics metadata');
+  for(const entrypoint of ['standalone','sidebar','handoff']){
+    const allowed=brandEngineEventPayload({event_name:'brand_engine_viewed',properties:{entrypoint}});
+    assert.equal(allowed.properties.entrypoint,entrypoint);
+  }
   assert.throws(()=>brandEngineEventPayload({event_name:'brand_engine_seed_words_collected'}),error=>error.code==='EVENT_INVALID');
 });
