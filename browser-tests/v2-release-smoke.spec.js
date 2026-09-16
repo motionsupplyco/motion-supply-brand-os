@@ -77,7 +77,7 @@ test('mobile sidebar utilities and custom V2 navigation close the drawer after s
   expect(errors,`uncaught browser errors: ${errors.join(' | ')}`).toEqual([]);
 });
 
-test('Brand Engine generates founder directions and labels domain evidence without fake availability claims',async({page})=>{
+test('Brand Engine generates founder directions with official pre-screen steps and truthful domain evidence',async({page})=>{
   const errors=collectPageErrors(page),events=[];
   await page.setViewportSize({width:1280,height:1000});
   await page.route('**/api/brand-engine/event',async route=>{events.push(JSON.parse(route.request().postData()||'{}'));await route.fulfill({status:200,contentType:'application/json',body:'{"ok":true}'})});
@@ -94,10 +94,16 @@ test('Brand Engine generates founder directions and labels domain evidence witho
   await page.locator('#vibe').selectOption('street');
   await page.locator('#generateNames').click();
   await expect(page.locator('.nameCard')).toHaveCount(12);
-  await page.locator('.nameCard').first().locator('[data-check-domains]').click();
-  await expect(page.locator('.nameCard').first().locator('.domainStatus.registered')).toHaveText('REGISTERED');
-  await expect(page.locator('.nameCard').first().locator('.domainStatus.not_found')).toHaveText('NO RDAP RECORD');
-  await expect(page.locator('.nameCard').first()).not.toContainText(/AVAILABLE|TRADEMARK CLEAR/i);
+  const first=page.locator('.nameCard').first();
+  await expect(first.locator('.trademarkBlock')).toContainText('USPTO FEDERAL PRE-SCREEN');
+  await expect(first.locator('.trademarkBlock')).toContainText('SCREENING ONLY');
+  await expect(first.locator('.trademarkQuery').first().locator('code')).toContainText('CM:"');
+  await expect(first.locator('.trademarkActions a')).toHaveAttribute('href','https://tmsearch.uspto.gov/');
+  await expect(first.locator('.trademarkDisclaimer')).toContainText(/not a clearance opinion/i);
+  await first.locator('[data-check-domains]').click();
+  await expect(first.locator('.domainStatus.registered')).toHaveText('REGISTERED');
+  await expect(first.locator('.domainStatus.not_found')).toHaveText('NO RDAP RECORD');
+  await expect(first).not.toContainText(/AVAILABLE|TRADEMARK CLEAR|CLEARANCE SCORE/i);
   await expect.poll(()=>events.filter(event=>event.event_name==='brand_engine_names_generated').length).toBe(1);
   await expect.poll(()=>events.filter(event=>event.event_name==='brand_engine_domain_checked').length).toBe(1);
   const analyticsText=JSON.stringify(events);
