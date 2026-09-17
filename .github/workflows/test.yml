@@ -39,6 +39,7 @@ jobs:
           node --check public/help.js
           node --check public/accessibility.js
           node --check public/workspace-route.js
+          node --check public/settings-ui.js
           node --check public/problem-navigator.js
           node --check public/problem-navigator-ui.js
           node --check public/guided-dashboard.js
