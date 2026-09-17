@@ -49,8 +49,8 @@ jobs:
       - name: Run full Chromium interaction and device QA
         run: npx playwright test browser-tests/*.spec.js --project=chromium --reporter=line
 
-      - name: Run WebKit responsive device matrix
-        run: npx playwright test browser-tests/device-matrix-smoke.spec.js --project=webkit --reporter=line
+      - name: Run WebKit responsive matrix and app-shell history regression
+        run: npx playwright test browser-tests/device-matrix-smoke.spec.js browser-tests/app-shell-history-settings.spec.js --project=webkit --reporter=line
 
       - name: Upload visual review screenshots
         if: always()
