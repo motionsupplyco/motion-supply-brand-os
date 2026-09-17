@@ -4,6 +4,7 @@ const escapeHtml=value=>String(value??'').replace(/[&<>'"]/g,char=>({'&':'&amp;'
 
 function loadSession(){try{return JSON.parse(localStorage.getItem('msbo_session')||'null')}catch{return null}}
 function isStandalone(){return window.matchMedia?.('(display-mode: standalone)').matches||window.navigator.standalone===true}
+function setSettingsMode(active){document.body.classList.toggle('settingsWorkspaceOpen',Boolean(active))}
 
 function markSettingsActive(){
   $$('#nav button').forEach(button=>button.classList.toggle('active',button.id==='settingsNav'));
@@ -15,6 +16,7 @@ function renderSettings(){
   window.msboCloseMenu?.({restoreFocus:false});
   const app=$('#app'),title=$('#title');
   if(!app||!title)return;
+  setSettingsMode(true);
   title.textContent='Settings';
   markSettingsActive();
 
@@ -109,11 +111,16 @@ function renderSettings(){
   window.scrollTo(0,0);
 }
 
-function onSettingsClick(event){
-  if(!event.target.closest('#settingsNav'))return;
+function onNavClick(event){
+  const navTarget=event.target.closest('#nav button');
+  if(!navTarget)return;
+  if(navTarget.id!=='settingsNav'){
+    setSettingsMode(false);
+    return;
+  }
   event.preventDefault();
   renderSettings();
 }
 
-document.addEventListener('click',onSettingsClick);
+document.addEventListener('click',onNavClick);
 window.msboOpenSettings=renderSettings;
