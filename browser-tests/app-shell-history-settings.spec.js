@@ -18,6 +18,10 @@ async function openClean(page,{width=1440,height=1000}={}){
   await expect(page.locator('#title')).toHaveText('Business Health');
 }
 
+async function expectDrawerOffCanvas(page){
+  await expect.poll(async()=>page.locator('#side').evaluate(el=>Math.round(el.getBoundingClientRect().right)),{timeout:2000}).toBeLessThanOrEqual(1);
+}
+
 test('browser back walks through Brand OS workspaces before leaving the app',async({page})=>{
   const errors=collectPageErrors(page);
   await openClean(page);
@@ -70,6 +74,7 @@ test('Settings stays app-like and overflow-free on a 390px iPhone layout',async(
   await page.locator('#settingsNav').scrollIntoViewIfNeeded();
   await page.locator('#settingsNav').click();
   await expect(page.locator('#side')).not.toHaveClass(/\bopen\b/);
+  await expectDrawerOffCanvas(page);
   await expect(page.locator('#title')).toHaveText('Settings');
   await expect(page.locator('[data-settings-root]')).toBeVisible();
   await expect.poll(async()=>page.evaluate(()=>document.documentElement.scrollWidth-window.innerWidth),{timeout:2000}).toBeLessThanOrEqual(1);
