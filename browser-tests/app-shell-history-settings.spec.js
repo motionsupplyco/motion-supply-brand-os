@@ -52,6 +52,7 @@ test('Settings is a real workspace and participates in browser history',async({p
   await expect(page.locator('#title')).toHaveText('Settings');
   await expect(page.locator('[data-settings-root]')).toBeVisible();
   await expect(page.locator('#settingsNav')).toHaveClass(/\bactive\b/);
+  await expect(page.locator('#floatingHelp')).toBeHidden();
   await expect(page.locator('[data-settings-root]')).toContainText('ACCOUNT & PLAN');
   await expect(page.locator('[data-settings-root]')).toContainText('WORKSPACE & DATA');
   await expect(page.locator('[data-settings-root]')).toContainText('APP ACCESS');
@@ -59,9 +60,11 @@ test('Settings is a real workspace and participates in browser history',async({p
 
   await page.locator('#nav button[data-view="profit"]').click();
   await expect(page.locator('#title')).toHaveText('Profit & Pricing');
+  await expect(page.locator('#floatingHelp')).toBeVisible();
   await page.evaluate(()=>history.back());
   await expect(page.locator('#title')).toHaveText('Settings');
   await expect(page.locator('[data-settings-root]')).toBeVisible();
+  await expect(page.locator('#floatingHelp')).toBeHidden();
   expect(errors).toEqual([]);
 });
 
@@ -77,6 +80,7 @@ test('Settings stays app-like and overflow-free on a 390px iPhone layout',async(
   await expectDrawerOffCanvas(page);
   await expect(page.locator('#title')).toHaveText('Settings');
   await expect(page.locator('[data-settings-root]')).toBeVisible();
+  await expect(page.locator('#floatingHelp')).toBeHidden();
   await expect.poll(async()=>page.evaluate(()=>document.documentElement.scrollWidth-window.innerWidth),{timeout:2000}).toBeLessThanOrEqual(1);
   await page.screenshot({path:`${SHOTS}/settings-mobile-390.png`,fullPage:true});
   expect(errors).toEqual([]);
