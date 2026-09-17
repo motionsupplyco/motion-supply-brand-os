@@ -1,0 +1,67 @@
+name: Production Health Monitor
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-health-monitor
+  cancel-in-progress: true
+
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check production app root
+        run: |
+          curl --fail --silent --show-error --location \
+            --retry 2 --retry-delay 5 --retry-all-errors \
+            --connect-timeout 10 --max-time 30 \
+            https://www.motionsupplyos.com/ \
+            --output /dev/null
+
+      - name: Check production API health contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          body="$(curl --fail --silent --show-error --location \
+            --retry 2 --retry-delay 5 --retry-all-errors \
+            --connect-timeout 10 --max-time 30 \
+            https://www.motionsupplyos.com/api/health)"
+
+          HEALTH_JSON="$body" node <<'NODE'
+          const raw = process.env.HEALTH_JSON || '';
+          let health;
+          try {
+            health = JSON.parse(raw);
+          } catch {
+            console.error(JSON.stringify({ event: 'production_health_check', ok: false, reason: 'invalid_json' }));
+            process.exit(1);
+          }
+
+          const required = ['ok', 'authConfigured', 'cloudConfigured', 'billingConfigured'];
+          const failed = required.filter((key) => health?.[key] !== true);
+
+          if (failed.length) {
+            console.error(JSON.stringify({
+              event: 'production_health_check',
+              ok: false,
+              reason: 'health_contract_failed',
+              failed
+            }));
+            process.exit(1);
+          }
+
+          console.log(JSON.stringify({
+            event: 'production_health_check',
+            ok: true,
+            authConfigured: true,
+            cloudConfigured: true,
+            billingConfigured: true
+          }));
+          NODE

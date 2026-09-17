@@ -1,0 +1,19 @@
+.settingsWorkspaceOpen #floatingHelp{display:none}
+.settingsWrap{max-width:1180px;margin:0 auto;padding-bottom:32px}
+.settingsHead{margin-bottom:18px}
+.settingsGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.settingsCard{min-width:0}
+.settingsCard h3{margin:8px 0 10px}
+.settingsActions{display:flex;flex-wrap:wrap;gap:9px;margin-top:14px}
+.settingsActions button{min-height:42px}
+.settingsStatus{display:grid;grid-template-columns:1fr auto;gap:8px 14px;padding:12px 0;border-top:1px solid rgba(255,255,255,.08);border-bottom:1px solid rgba(255,255,255,.08)}
+.settingsStatus span{color:var(--muted,#90939b)}
+.settingsStatus b{text-transform:capitalize;text-align:right}
+.settingsInstall{display:grid;gap:5px;padding:14px;border:1px solid rgba(255,255,255,.1);border-radius:12px;background:rgba(255,255,255,.025)}
+.settingsInstall span{color:var(--muted,#90939b);line-height:1.5}
+.settingsLinks{display:grid;gap:8px;margin-top:14px}
+.settingsLink{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 12px;border:1px solid rgba(255,255,255,.09);border-radius:10px;text-decoration:none;color:inherit;background:rgba(255,255,255,.02)}
+.settingsLink:hover,.settingsLink:focus-visible{border-color:rgba(255,255,255,.25);background:rgba(255,255,255,.05)}
+.settingsNote{margin-top:12px}
+#settingsClearImport:disabled{opacity:.45;cursor:not-allowed}
+@media(max-width:760px){.settingsGrid{grid-template-columns:1fr}.settingsWrap{padding-bottom:18px}.settingsActions{display:grid;grid-template-columns:1fr}.settingsActions button{width:100%}.settingsHead .source{align-self:flex-start}}
