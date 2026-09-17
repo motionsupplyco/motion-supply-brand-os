@@ -10,6 +10,7 @@ function modalParts(){
 function closeNavigator(){
   const {root}=modalParts();
   root?.classList.add('hidden');
+  document.body.classList.remove('problemNavigatorOpen');
 }
 
 function openNavigator(){
@@ -19,6 +20,7 @@ function openNavigator(){
   box.classList.add('problemNavigatorModal');
   box.setAttribute('aria-label','Solve a business problem');
   body.innerHTML=problemNavigator();
+  document.body.classList.add('problemNavigatorOpen');
   root.classList.remove('hidden');
 }
 
@@ -83,6 +85,7 @@ const root=$('#modal');
 if(root){
   new MutationObserver(()=>{
     if(!root.classList.contains('hidden'))return;
+    document.body.classList.remove('problemNavigatorOpen');
     const box=root.querySelector('.modalbox');
     box?.classList.remove('problemNavigatorModal');
     box?.setAttribute('aria-label','Brand OS dialog');
