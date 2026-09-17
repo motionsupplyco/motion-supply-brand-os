@@ -37,7 +37,14 @@ jobs:
           node --check public/math.js
           node --check public/shopify.js
           node --check public/help.js
+          node --check public/accessibility.js
           node --check public/workspace-route.js
+          node --check public/problem-navigator.js
+          node --check public/problem-navigator-ui.js
+          node --check public/guided-dashboard.js
+          node --check public/workspace-decision-context.js
+          node --check public/advisor-guidance.js
+          node --check public/advisor-resources.js
           node --check public/operating-intelligence.js
           node --check public/collection-stress.js
           node --check public/net-profit-guardrails.js
@@ -54,6 +61,10 @@ jobs:
           node --check public/manufacturing-cash-handoff-ui.js
           node --check public/production-milestones-ui.js
           node --check public/production-alert-bridge-ui.js
+          node --check public/brand-engine-core.js
+          node --check public/brand-engine-analytics.js
+          node --check public/brand-engine-ui.js
+          node --check public/brand-engine-handoff.js
           node --check lib/stripe-webhook-state.js
           node --check lib/integration-crypto.js
           node --check lib/integration-providers.js
@@ -61,5 +72,7 @@ jobs:
           node --check lib/shopify-webhooks.js
           node --check lib/v2-routes.js
           node --check lib/v2-planning-routes.js
+          node --check lib/rdap-domain.js
+          node --check lib/brand-engine-routes.js
       - name: Run tests
         run: npm test
